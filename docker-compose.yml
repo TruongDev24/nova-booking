@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: nova-postgres
+    restart: always
+    ports:
+      - "5434:5432"  # Đổi cổng bên ngoài thành 5434 để né 5432 và 5433
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: nova_booking_db
+    volumes:
+      - nova_isolated_data:/var/lib/postgresql/data # Đổi tên volume
+
+volumes:
+  nova_isolated_data: # Đổi tên volume
