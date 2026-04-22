@@ -9,49 +9,114 @@ datasource db {
 enum Role {
   ADMIN
   USER
+  COURT_MANAGER
 }
 
 enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL_PAID
+  PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  E_WALLET
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
+  id        String   @id @default(uuid())
+  email     String   @unique
   password  String
-  fullName  String?
-  phone     String?
-  role      Role      @default(USER)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  bookings  Booking[]
+  fullName  String
+  phone     String
+  avatar    String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings Booking[]
+  payments Payment[]
+  reviews  Review[]
 }
 
 model Court {
-  id           String    @id @default(uuid())
+  id           String   @id @default(uuid())
   name         String
   location     String
-  description  String?
+  description  String
   pricePerHour Float
-  isDeleted    Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  bookings     Booking[]
+  openingTime  String
+  closingTime  String
+  amenities    String[]
+  images       String[]
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  bookings Booking[]
+  reviews  Review[]
 }
 
 model Booking {
-  id          String        @id @default(uuid())
-  userId      String
-  courtId     String
-  startTime   DateTime
-  endTime     DateTime
-  status      BookingStatus @default(PENDING)
-  totalAmount Float
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id            String        @id @default(uuid())
+  userId        String
+  courtId       String
+  startTime     DateTime
+  endTime       DateTime
+  totalHours    Float
+  totalAmount   Float
+  status        BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+  cancelReason  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id])
+  court   Court    @relation(fields: [courtId], references: [id])
+  payment Payment?
+
+  @@index([startTime, endTime])
+  @@index([courtId, status])
+  @@index([courtId, startTime])
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  bookingId     String        @unique
+  userId        String
+  amount        Float
+  method        PaymentMethod
+  transactionId String?
+  status        PaymentStatus
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId])
+  @@index([userId, status])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  courtId   String
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id])
   court Court @relation(fields: [courtId], references: [id])
+
+  @@index([courtId])
 }

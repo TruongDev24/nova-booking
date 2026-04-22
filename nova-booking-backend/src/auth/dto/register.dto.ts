@@ -17,10 +17,14 @@ export class RegisterDto {
   password!: string;
 
   @IsString()
-  @IsOptional()
-  fullName?: string;
+  @IsNotEmpty()
+  fullName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  phone!: string;
 
   @IsString()
   @IsOptional()
-  phone?: string;
+  avatar?: string;
 }

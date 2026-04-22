@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -16,11 +17,29 @@ export class CreateCourtDto {
   location!: string;
 
   @IsString()
-  @IsOptional()
-  description?: string;
+  @IsNotEmpty()
+  description!: string;
 
   @IsNumber()
   @Min(0)
   @IsNotEmpty()
   pricePerHour!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  openingTime!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  closingTime!: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  amenities?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  images?: string[];
 }

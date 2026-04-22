@@ -1,17 +1,57 @@
 version: '3.8'
+
 services:
   db:
     image: postgres:15-alpine
     container_name: nova-postgres
-    restart: always
-    ports:
-      - "5434:5432"  # Đổi cổng bên ngoài thành 5434 để né 5432 và 5433
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: rootpassword
       POSTGRES_DB: nova_booking_db
+    ports:
+      - "5435:5432"
     volumes:
-      - nova_isolated_data:/var/lib/postgresql/data # Đổi tên volume
+      - nova_pg_data:/var/lib/postgresql/data # Đã đổi thành Named Volume (xóa dấu ./)
+    networks:
+      - nova-network
+    restart: always
 
+  backend:
+    build:
+      context: ./nova-booking-backend
+      dockerfile: Dockerfile
+    container_name: nova-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=postgresql://root:rootpassword@db:5432/nova_booking_db?schema=public
+      - JWT_SECRET=super-secret-key-for-jwt
+      - PORT=3001
+    depends_on:
+      - db
+    networks:
+      - nova-network
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nova-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    depends_on:
+      - backend
+    networks:
+      - nova-network
+    restart: always
+
+networks:
+  nova-network:
+    driver: bridge
+
+# THÊM KHỐI NÀY ĐỂ KHAI BÁO VOLUME ẢO CHO DOCKER
 volumes:
-  nova_isolated_data: # Đổi tên volume
+  nova_pg_data:
