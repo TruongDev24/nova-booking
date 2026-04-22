@@ -14,6 +14,14 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
+  async findByEmailOrPhone(email: string, phone: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { phone }],
+      },
+    });
+  }
+
   async findById(id: string) {
     return this.prisma.user.findUnique({ where: { id } });
   }

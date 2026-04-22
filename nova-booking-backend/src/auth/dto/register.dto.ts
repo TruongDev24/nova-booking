@@ -4,20 +4,26 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class RegisterDto {
+  @Transform(({ value }) => value?.trim())
   @IsEmail({}, { message: 'Invalid email format' })
   @IsNotEmpty()
+  @MaxLength(150)
   email!: string;
 
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  @MinLength(8, { message: 'Password must be at least 8 characters long' })
   @IsNotEmpty()
   password!: string;
 
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100, { message: 'Full name is too long' })
   fullName!: string;
 
   @IsString()

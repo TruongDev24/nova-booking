@@ -4,17 +4,21 @@ services:
   db:
     image: postgres:15-alpine
     container_name: nova-postgres
-    environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: rootpassword
-      POSTGRES_DB: nova_booking_db
+    env_file:
+      - ./nova-booking-backend/.env
     ports:
       - "5435:5432"
     volumes:
-      - nova_pg_data:/var/lib/postgresql/data # Đã đổi thành Named Volume (xóa dấu ./)
+      - nova_pg_data:/var/lib/postgresql/data
     networks:
       - nova-network
     restart: always
+    # Thêm healthcheck để "condition: service_healthy" ở dưới hoạt động được
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d nova_booking_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -23,13 +27,15 @@ services:
     container_name: nova-backend
     ports:
       - "3001:3001"
+    volumes:
+      - ./nova-booking-backend:/app
+      - /app/node_modules
     environment:
       - DATABASE_URL=postgresql://root:rootpassword@db:5432/nova_booking_db?schema=public
-      - JWT_SECRET=super-secret-key-for-jwt
-      - PORT=3001
     depends_on:
-      - db
-    networks:
+      db:
+        condition: service_healthy
+    networks: # QUAN TRỌNG: Phải có dòng này
       - nova-network
     restart: always
 
@@ -38,10 +44,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: nova-frontend
+    env_file:
+      - ./frontend/.env.local
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     depends_on:
       - backend
     networks:
@@ -52,6 +62,5 @@ networks:
   nova-network:
     driver: bridge
 
-# THÊM KHỐI NÀY ĐỂ KHAI BÁO VOLUME ẢO CHO DOCKER
 volumes:
   nova_pg_data:
