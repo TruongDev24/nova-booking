@@ -9,10 +9,12 @@ import { APP_GUARD } from '@nestjs/core';
 @Module({
   imports: [
     UsersModule,
-    JwtModule.register({
+    JwtModule.registerAsync({
       global: true,
-      secret: process.env.JWT_SECRET || 'super-secret-key-for-jwt',
-      signOptions: { expiresIn: '1d' },
+      useFactory: () => ({
+        secret: process.env.JWT_SECRET || 'super-secret-key-for-jwt',
+        signOptions: { expiresIn: '1d' },
+      }),
     }),
   ],
   providers: [

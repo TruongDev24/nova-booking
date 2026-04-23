@@ -46,6 +46,7 @@ model User {
   bookings Booking[]
   payments Payment[]
   reviews  Review[]
+  courts   Court[]
 }
 
 model Court {
@@ -58,10 +59,12 @@ model Court {
   closingTime  String
   amenities    String[]
   images       String[]
+  ownerId      String
   isDeleted    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  owner    User      @relation(fields: [ownerId], references: [id])
   bookings Booking[]
   reviews  Review[]
 }

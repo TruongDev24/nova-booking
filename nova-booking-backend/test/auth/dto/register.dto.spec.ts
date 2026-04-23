@@ -68,11 +68,11 @@ describe('RegisterDto', () => {
       email: '  test@example.com  ',
       fullName: '  John Doe  ',
       password: 'Password123',
-      phone: '0123456789'
+      phone: '0123456789',
     };
 
     const transformedDto = plainToInstance(RegisterDto, plainData);
-    
+
     expect(transformedDto.email).toBe('test@example.com');
     expect(transformedDto.fullName).toBe('John Doe');
   });

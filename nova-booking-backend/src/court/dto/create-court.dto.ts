@@ -1,29 +1,30 @@
 import {
-  IsArray,
   IsNotEmpty,
   IsNumber,
-  IsOptional,
   IsString,
   Min,
+  IsOptional,
+  IsArray,
+  MinLength,
 } from 'class-validator';
 
 export class CreateCourtDto {
   @IsString()
   @IsNotEmpty()
+  @MinLength(3, { message: 'Tên sân phải có ít nhất 3 ký tự' })
   name!: string;
 
   @IsString()
   @IsNotEmpty()
   location!: string;
 
-  @IsString()
-  @IsNotEmpty()
-  description!: string;
-
   @IsNumber()
   @Min(0)
-  @IsNotEmpty()
   pricePerHour!: number;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
 
   @IsString()
   @IsNotEmpty()

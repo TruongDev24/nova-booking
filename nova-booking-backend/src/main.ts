@@ -5,7 +5,7 @@ import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   app.enableCors(); // Allow frontend Next.js to call the API
 
   app.useGlobalPipes(
@@ -19,4 +19,7 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3001); // Ensure port 3001 for correct backend sync
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

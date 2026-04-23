@@ -7,6 +7,7 @@ import * as z from "zod";
 import axios from "axios";
 import { toast, Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 import {
   User,
   Mail,
@@ -18,6 +19,17 @@ import {
   Loader2,
 } from "lucide-react";
 import Link from "next/link";
+
+// --- Types ---
+interface RegisterResponse {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: "USER" | "ADMIN";
+  };
+}
 
 // --- Validation Schema with Zod ---
 const registerSchema = z
@@ -36,6 +48,9 @@ const registerSchema = z
       .regex(/[A-Z]/, "Password must contain at least 1 uppercase letter")
       .regex(/[0-9]/, "Password must contain at least 1 number"),
     confirmPassword: z.string(),
+    role: z.enum(["USER", "ADMIN"], {
+          message: "Role must be USER or ADMIN"
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -52,6 +67,8 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -61,32 +78,53 @@ export default function RegisterPage() {
       phone: "",
       password: "",
       confirmPassword: "",
+      role: "USER",
     },
   });
 
+  const selectedRole = watch("role");
+
   const onSubmit = async (data: RegisterFormValues) => {
     try {
-      await axios.post(
+      const response = await axios.post<RegisterResponse>(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/auth/register`,
         {
           fullName: data.fullName,
           email: data.email,
           phone: data.phone,
           password: data.password,
+          role: data.role,
         }
       );
 
+      // Save token to Cookies for middleware compatibility
+      const token = response.data?.access_token;
+      const user = response.data?.user;
+      const userRole = user?.role || data.role; // Fallback to form role
+
+      if (token) {
+        Cookies.set("access_token", token, { expires: 1, path: "/" });
+        localStorage.setItem("access_token", token);
+        if (user) {
+          localStorage.setItem("user", JSON.stringify(user));
+        }
+      }
+
       toast.success("Account created successfully!");
-      // Briefly delay to let user see toast, then push
+      
+      // Redirect based on role
       setTimeout(() => {
-        router.push("/login");
+        if (userRole === "ADMIN") {
+          router.push("/admin");
+        } else {
+          router.push("/user");
+        }
       }, 1500);
-    } catch (error) {
+    } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        console.error("Registration Backend Error Details:", error.response?.data || error);
+        const errorData = error.response?.data as { message?: string | string[] };
+        const errorMsg = errorData.message || "Something went wrong during registration.";
         
-        const errorMsg = error.response?.data?.message || "Something went wrong during registration.";
-        // Extract array messages if class-validator returns multiple
         if (Array.isArray(errorMsg)) {
           toast.error(errorMsg[0]);
         } else {
@@ -103,9 +141,7 @@ export default function RegisterPage() {
       <Toaster position="top-right" reverseOrder={false} />
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
         
-        {/* Header Section */}
         <div className="bg-slate-900 px-6 py-8 text-center relative overflow-hidden">
-          {/* Decorative Background Elements */}
           <div className="absolute -top-12 -right-12 w-32 h-32 bg-indigo-500 rounded-full opacity-10 blur-2xl"></div>
           <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-cyan-500 rounded-full opacity-10 blur-xl"></div>
           
@@ -120,10 +156,36 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* Form Section */}
         <div className="p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Full Name */}
+            <div className="bg-slate-50 p-1.5 rounded-xl flex gap-1 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setValue("role", "USER")}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
+                  selectedRole === "USER"
+                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Người chơi (USER)
+              </button>
+              <button
+                type="button"
+                onClick={() => setValue("role", "ADMIN")}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
+                  selectedRole === "ADMIN"
+                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Chủ sân (ADMIN)
+              </button>
+            </div>
+            {errors.role && (
+              <p className="text-xs text-red-500 text-center">{errors.role.message}</p>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Full Name
@@ -150,7 +212,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Email Address
@@ -177,7 +238,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Phone Number
@@ -204,7 +264,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Password
@@ -242,7 +301,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Confirm Password
@@ -280,7 +338,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -297,14 +354,12 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          {/* Footer Link */}
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-600">
               Already have an account?{" "}
               <Link
                 href="/login"
                 className="font-semibold text-cyan-600 hover:text-cyan-500 transition-colors"
-                onClick={(e) => e.preventDefault()} // Remove this when actual routing exists
               >
                 Sign In
               </Link>
