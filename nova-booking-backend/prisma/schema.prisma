@@ -73,10 +73,10 @@ model Booking {
   id            String        @id @default(uuid())
   userId        String
   courtId       String
-  startTime     DateTime
-  endTime       DateTime
-  totalHours    Float
-  totalAmount   Float
+  bookingDate   String        // Định dạng YYYY-MM-DD
+  startTime     String        // Định dạng HH:mm
+  endTime       String        // Định dạng HH:mm
+  totalPrice    Float
   status        BookingStatus @default(PENDING)
   paymentStatus PaymentStatus @default(UNPAID)
   cancelReason  String?
@@ -87,9 +87,9 @@ model Booking {
   court   Court    @relation(fields: [courtId], references: [id])
   payment Payment?
 
-  @@index([startTime, endTime])
+  @@unique([courtId, bookingDate, startTime])
+  @@index([bookingDate])
   @@index([courtId, status])
-  @@index([courtId, startTime])
 }
 
 model Payment {

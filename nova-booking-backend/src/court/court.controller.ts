@@ -9,6 +9,9 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFiles,
+  Query,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { CourtService } from './court.service';
 import { CreateCourtDto } from './dto/create-court.dto';
@@ -20,6 +23,7 @@ import { Role } from '@prisma/client';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import type { UserPayload } from '../common/interfaces/user-payload.interface';
 
 @Controller('courts')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -66,13 +70,19 @@ export class CourtController {
   }
 
   @Get()
-  @Roles(Role.ADMIN)
-  findAll(@GetUser('sub') userId: string) {
-    return this.courtService.findAll(userId);
+  @Roles(Role.ADMIN, Role.USER)
+  findAll(
+    @GetUser() user: UserPayload,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('search') search?: string,
+  ) {
+    // Nếu là ADMIN, có thể lọc theo ownerId (tùy chọn), nếu là USER thì xem tất cả
+    return this.courtService.findAll(user, page, limit, search);
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
   findOne(@Param('id') id: string) {
     return this.courtService.findOne(id);
   }

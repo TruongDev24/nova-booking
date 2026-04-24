@@ -2,11 +2,14 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
-import { Court, Prisma } from '@prisma/client';
+import { Court, Prisma, Role } from '@prisma/client';
+import type { UserPayload } from '../common/interfaces/user-payload.interface';
 
 @Injectable()
 export class CourtService {
@@ -16,6 +19,8 @@ export class CourtService {
     return this.prisma.court.create({
       data: {
         ...dto,
+        openingTime: dto.openingTime || '05:00',
+        closingTime: dto.closingTime || '22:00',
         description: dto.description ?? '',
         amenities: dto.amenities ?? [],
         images: dto.images ?? [],
@@ -24,45 +29,65 @@ export class CourtService {
     });
   }
 
-  /**
-   * Nâng cấp: Thêm Phân trang và Bộ lọc tìm kiếm
-   */
   async findAll(
-    ownerId: string,
-    page: number = 1,
-    limit: number = 10,
+    user: UserPayload,
+    page: any = 1,
+    limit: any = 10,
     search?: string,
-  ): Promise<{ data: Court[]; total: number; page: number; limit: number }> {
-    const skip = (page - 1) * limit;
+  ): Promise<{
+    data: Court[];
+    meta: { total: number; page: number; limit: number; lastPage: number };
+  }> {
+    if (!user) {
+      throw new UnauthorizedException('Thông tin người dùng không hợp lệ');
+    }
 
-    // Xây dựng điều kiện lọc linh hoạt
+    const validPage = Math.max(1, parseInt(page) || 1);
+    const validLimit = Math.max(1, parseInt(limit) || 10);
+    const skip = (validPage - 1) * validLimit;
+
+    // Build WHERE clause safely
     const where: Prisma.CourtWhereInput = {
-      ownerId,
       isDeleted: false,
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { location: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
     };
 
-    const [data, total] = await Promise.all([
-      this.prisma.court.findMany({
-        where,
-        skip: Number(skip),
-        take: Number(limit),
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.court.count({ where }),
-    ]);
+    if (user.role === Role.ADMIN) {
+      where.ownerId = user.sub;
+    }
 
-    return {
-      data,
-      total,
-      page: Number(page),
-      limit: Number(limit),
-    };
+    // Explicit search validation to prevent crashes
+    if (typeof search === 'string' && search.trim() !== '') {
+      const searchLower = search.trim();
+      where.OR = [
+        { name: { contains: searchLower, mode: 'insensitive' } },
+        { location: { contains: searchLower, mode: 'insensitive' } },
+      ];
+    }
+
+    try {
+      const [data, total] = await Promise.all([
+        this.prisma.court.findMany({
+          where,
+          skip,
+          take: validLimit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.court.count({ where }),
+      ]);
+
+      return {
+        data,
+        meta: {
+          total,
+          page: validPage,
+          limit: validLimit,
+          lastPage: Math.ceil(total / validLimit) || 1,
+        },
+      };
+    } catch (error) {
+      console.error('Prisma FindAll Error:', error);
+      throw new BadRequestException('Lỗi truy vấn dữ liệu sân');
+    }
   }
 
   async findOne(id: string): Promise<Court> {
@@ -75,22 +100,11 @@ export class CourtService {
     return court;
   }
 
-  /**
-   * Nâng cấp: Xem lịch đặt sân của một ngày cụ thể
-   */
   async getSchedule(courtId: string, date: string) {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    // Lấy các slot đã được đặt (không tính các booking đã hủy)
     return this.prisma.booking.findMany({
       where: {
         courtId,
-        startTime: { gte: startOfDay },
-        endTime: { lte: endOfDay },
+        bookingDate: date,
         status: { not: 'CANCELLED' },
       },
       select: {
@@ -110,34 +124,22 @@ export class CourtService {
   ): Promise<Court> {
     const court = await this.findOne(id);
     if (court.ownerId !== ownerId) {
-      throw new ForbiddenException(
-        'You do not have permission to update this court',
-      );
+      throw new ForbiddenException('You do not have permission to update this court');
     }
 
-    try {
-      return await this.prisma.court.update({
-        where: { id },
-        data: {
-          ...dto,
-        },
-      });
-    } catch (error) {
-      console.error('CourtService Update Prisma Error:', error);
-      throw error;
-    }
+    return this.prisma.court.update({
+      where: { id },
+      data: dto,
+    });
   }
 
-  async remove(id: string, ownerId: string): Promise<Court> {
+  async remove(id: string, ownerId: string): Promise<void> {
     const court = await this.findOne(id);
     if (court.ownerId !== ownerId) {
-      throw new ForbiddenException(
-        'You do not have permission to delete this court',
-      );
+      throw new ForbiddenException('You do not have permission to delete this court');
     }
 
-    // Soft delete: Giữ lại dữ liệu để thống kê nhưng ẩn khỏi danh sách hiển thị
-    return this.prisma.court.update({
+    await this.prisma.court.update({
       where: { id },
       data: { isDeleted: true },
     });

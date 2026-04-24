@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Map as MapIcon, Edit, Trash2, X, Loader2, Camera, Check, Wifi, Coffee, Car, ShoppingBag } from "lucide-react";
+import { Plus, Search, Map as MapIcon, Edit, Trash2, X, Loader2, Camera, Check, Wifi, Coffee, Car, ShoppingBag, ChevronLeft, ChevronRight } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { courtService, Court } from "@/services/court.service";
+import { courtService, Court, PaginatedCourts } from "@/services/court.service";
 import { toast, Toaster } from "react-hot-toast";
 
 // --- Configuration ---
@@ -30,7 +30,9 @@ const courtSchema = z.object({
 type CourtFormValues = z.infer<typeof courtSchema>;
 
 export default function AdminCourtsPage() {
-  const [courts, setCourts] = useState<Court[]>([]);
+  const [courtsData, setCourtsData] = useState<PaginatedCourts | null>(null);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourt, setEditingCourt] = useState<Court | null>(null);
@@ -63,15 +65,15 @@ export default function AdminCourtsPage() {
   const fetchCourts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await courtService.getAll();
-      setCourts(data);
+      const result = await courtService.getAll(page, 6, search);
+      setCourtsData(result);
     } catch (error) {
       console.error(error);
       toast.error("Không thể tải danh sách sân");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [page, search]);
 
   useEffect(() => {
     fetchCourts();
@@ -155,6 +157,9 @@ export default function AdminCourtsPage() {
     }
   };
 
+  const courts = courtsData?.data || [];
+  const meta = courtsData?.meta;
+
   const handleDelete = async (id: string) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa sân này?")) {
       try {
@@ -176,13 +181,25 @@ export default function AdminCourtsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Quản lý Sân</h1>
           <p className="text-slate-500 text-sm">Quản lý hình ảnh và tiện ích cho các sân cầu lông.</p>
         </div>
-        <button 
-          onClick={() => openModal()}
-          className="flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-cyan-500/25"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Thêm sân mới</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-cyan-500 transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Tìm tên sân..." 
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-cyan-500/10 focus:border-cyan-500 transition-all text-sm w-64"
+            />
+          </div>
+          <button 
+            onClick={() => openModal()}
+            className="flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-cyan-500/25"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="hidden md:inline">Thêm sân mới</span>
+          </button>
+        </div>
       </div>
 
       <div className="min-h-[400px]">
@@ -193,48 +210,74 @@ export default function AdminCourtsPage() {
         ) : courts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[400px] text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
             <MapIcon className="w-12 h-12 mb-4 opacity-10" />
-            <p className="font-medium">Chưa có sân nào được tạo</p>
+            <p className="font-medium">Không tìm thấy sân nào</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courts.map((court) => (
-              <div key={court.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-xl transition-all duration-300">
-                <div className="relative h-48 bg-slate-100">
-                  {court.images && court.images.length > 0 ? (
-                    <img src={court.images[0]} alt={court.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-300">
-                      <Camera className="w-10 h-10" />
-                    </div>
-                  )}
-                  <div className="absolute top-3 right-3 flex gap-2">
-                    <button onClick={() => openModal(court)} className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-blue-500 hover:bg-blue-500 hover:text-white shadow-sm transition-all">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(court.id)} className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-red-500 hover:bg-red-500 hover:text-white shadow-sm transition-all">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="p-5">
-                  <h3 className="font-bold text-slate-900 text-lg mb-1">{court.name}</h3>
-                  <p className="text-slate-500 text-sm mb-4 line-clamp-1">{court.location}</p>
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                    <span className="font-bold text-cyan-600 text-lg">{court.pricePerHour.toLocaleString()}đ<span className="text-xs font-normal text-slate-400">/giờ</span></span>
-                    <div className="flex -space-x-2">
-                       {Array.isArray(court.amenities) && court.amenities.map((a) => {
-                          const amenity = AMENITIES_LIST.find(item => item.id === a);
-                          return (
-                            <div key={a} className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px]" title={amenity?.label || a}>
-                               {amenity?.icon ? React.createElement(amenity.icon, { className: "w-3 h-3 text-slate-600" }) : "•"}
-                            </div>
-                          );
-                       })}
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courts.map((court) => (
+                <div key={court.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-xl transition-all duration-300">
+                  <div className="relative h-48 bg-slate-100">
+                    {court.images && court.images.length > 0 ? (
+                      <img src={court.images[0]} alt={court.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300">
+                        <Camera className="w-10 h-10" />
+                      </div>
+                    )}
+                    <div className="absolute top-3 right-3 flex gap-2">
+                      <button onClick={() => openModal(court)} className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-blue-500 hover:bg-blue-500 hover:text-white shadow-sm transition-all">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(court.id)} className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-red-500 hover:bg-red-500 hover:text-white shadow-sm transition-all">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
+                  <div className="p-5">
+                    <h3 className="font-bold text-slate-900 text-lg mb-1">{court.name}</h3>
+                    <p className="text-slate-500 text-sm mb-4 line-clamp-1">{court.location}</p>
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                      <span className="font-bold text-cyan-600 text-lg">{court.pricePerHour.toLocaleString()}đ<span className="text-xs font-normal text-slate-400">/giờ</span></span>
+                      <div className="flex -space-x-2">
+                         {Array.isArray(court.amenities) && court.amenities.map((a) => {
+                            const amenity = AMENITIES_LIST.find(item => item.id === a);
+                            return (
+                              <div key={a} className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px]" title={amenity?.label || a}>
+                                 {amenity?.icon ? React.createElement(amenity.icon, { className: "w-3 h-3 text-slate-600" }) : "•"}
+                              </div>
+                            );
+                         })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {meta && meta.lastPage > 1 && (
+              <div className="flex items-center justify-center gap-4 pt-4">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                  className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-900">Trang {page}</span>
+                  <span className="text-sm text-slate-400">/ {meta.lastPage}</span>
+                </div>
+                <button
+                  disabled={page === meta.lastPage}
+                  onClick={() => setPage(p => p + 1)}
+                  className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
