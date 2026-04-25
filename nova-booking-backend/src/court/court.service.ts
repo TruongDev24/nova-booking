@@ -13,7 +13,7 @@ import type { UserPayload } from '../common/interfaces/user-payload.interface';
 
 @Injectable()
 export class CourtService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateCourtDto, ownerId: string): Promise<Court> {
     return this.prisma.court.create({
@@ -42,8 +42,14 @@ export class CourtService {
       throw new UnauthorizedException('Thông tin người dùng không hợp lệ');
     }
 
-    const validPage = Math.max(1, parseInt(page) || 1);
-    const validLimit = Math.max(1, parseInt(limit) || 10);
+    const validPage = Math.max(
+      1,
+      typeof page === 'string' ? parseInt(page, 10) : Number(page) || 1,
+    );
+    const validLimit = Math.max(
+      1,
+      typeof limit === 'string' ? parseInt(limit, 10) : Number(limit) || 10,
+    );
     const skip = (validPage - 1) * validLimit;
 
     // Build WHERE clause safely
@@ -124,7 +130,9 @@ export class CourtService {
   ): Promise<Court> {
     const court = await this.findOne(id);
     if (court.ownerId !== ownerId) {
-      throw new ForbiddenException('You do not have permission to update this court');
+      throw new ForbiddenException(
+        'You do not have permission to update this court',
+      );
     }
 
     return this.prisma.court.update({
@@ -136,7 +144,9 @@ export class CourtService {
   async remove(id: string, ownerId: string): Promise<void> {
     const court = await this.findOne(id);
     if (court.ownerId !== ownerId) {
-      throw new ForbiddenException('You do not have permission to delete this court');
+      throw new ForbiddenException(
+        'You do not have permission to delete this court',
+      );
     }
 
     await this.prisma.court.update({

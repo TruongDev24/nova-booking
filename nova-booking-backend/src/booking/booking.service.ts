@@ -1,7 +1,13 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class BookingService {
@@ -16,18 +22,12 @@ export class BookingService {
       throw new NotFoundException('Court not found');
     }
 
-    // Logic: Nếu closingTime là 00:00, ta coi đó là giờ thứ 24
-    const openTimeStr = court.openingTime || '05:00';
-    const closeTimeStr = court.closingTime || '22:00';
+    const courtOpen = court.openingTime || '05:00';
+    const courtClose = court.closingTime || '22:00';
 
-    let openingHour = parseInt(openTimeStr.split(':')[0], 10);
-    let closingHour = parseInt(closeTimeStr.split(':')[0], 10);
-
-    if (closeTimeStr === '00:00') closingHour = 24;
-
-    // Fallbacks
-    if (isNaN(openingHour)) openingHour = 5;
-    if (isNaN(closingHour)) closingHour = 22;
+    const openHour = parseInt(courtOpen.split(':')[0], 10);
+    const closeHour = parseInt(courtClose.split(':')[0], 10);
+    const is24Hours = courtOpen === '00:00' && courtClose === '00:00';
 
     const existingBookings = await this.prisma.booking.findMany({
       where: {
@@ -37,34 +37,48 @@ export class BookingService {
       },
     });
 
-    const now = new Date();
-    // UTC+7 Offset calculation
-    const vnNow = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-    const todayStr = now.toISOString().split('T')[0];
-    const currentHour = now.getHours();
-
     const slots: Array<{
       startTime: string;
       endTime: string;
       isBooked: boolean;
       isPast: boolean;
+      isClosed: boolean;
       price: number;
     }> = [];
 
-    for (let hour = openingHour; hour < closingHour; hour++) {
-      const startTime = `${hour.toString().padStart(2, '0')}:00`;
-      const nextHour = hour + 1;
-      const endTime = nextHour === 24 ? '00:00' : `${nextHour.toString().padStart(2, '0')}:00`;
+    const now = new Date();
 
-      // Check if slot is in the past
-      const isPast = date < todayStr || (date === todayStr && hour <= currentHour);
+    // ALWAYS generate 24 slots (00:00 to 23:00)
+    for (let h = 0; h < 24; h++) {
+      const startTime = `${h.toString().padStart(2, '0')}:00`;
+      const endTime = `${(h + 1).toString().padStart(2, '0')}:00`;
+
+      // 1. Check if Closed (Outside operating hours)
+      let isClosed = false;
+      if (!is24Hours) {
+        if (openHour < closeHour) {
+          // Normal day (e.g., 05:00 to 22:00)
+          if (h < openHour || h >= closeHour) isClosed = true;
+        } else {
+          // Cross-day (e.g., 23:00 to 22:00)
+          if (h >= closeHour && h < openHour) isClosed = true;
+        }
+      }
+
+      // 2. Check if Past Time (Real-time comparison)
+      const [year, month, day] = date.split('-').map(Number);
+      const slotDateTime = new Date(year, month - 1, day, h, 0, 0, 0);
+      const isPast = slotDateTime < now;
+
+      // 3. Check if Booked
       const isBooked = existingBookings.some((b) => b.startTime === startTime);
 
       slots.push({
         startTime,
         endTime,
-        isBooked: isBooked || isPast,
+        isBooked,
         isPast,
+        isClosed,
         price: court.pricePerHour,
       });
     }
@@ -73,18 +87,28 @@ export class BookingService {
   }
 
   async createMultiBooking(dto: CreateBookingDto, userId: string) {
-    const { courtId, bookingDate, slots, totalPrice, startTime: dtStartTime } = dto;
+    const {
+      courtId,
+      bookingDate,
+      slots,
+      totalPrice,
+      startTime: dtStartTime,
+    } = dto;
 
-    const court = await this.prisma.court.findUnique({ where: { id: courtId } });
+    const court = await this.prisma.court.findUnique({
+      where: { id: courtId },
+    });
     if (!court) {
       throw new NotFoundException('Court not found');
     }
 
-    // Phase 1: Robust fallback logic for operating hours
     const courtOpen = court.openingTime || '05:00';
-    const courtClose = court.closingTime === '00:00' ? '24:00' : (court.closingTime || '22:00');
+    const courtClose = court.closingTime || '22:00';
 
-    // Normalize slots
+    const cOpen = parseInt(courtOpen.split(':')[0], 10);
+    let cClose = parseInt(courtClose.split(':')[0], 10);
+    if (cClose <= cOpen) cClose += 24;
+
     const slotsToBook: string[] = [];
     if (slots && slots.length > 0) {
       slotsToBook.push(...slots);
@@ -93,42 +117,48 @@ export class BookingService {
     }
 
     if (slotsToBook.length === 0) {
-       throw new BadRequestException('Vui lòng chọn khung giờ đặt sân');
+      throw new BadRequestException('Vui lòng chọn khung giờ đặt sân');
     }
 
-    // Phase 2: Enforce 1-hour interval and Validate Hours (Midnight-Safe)
     const finalBookings = slotsToBook.map((startTime) => {
-      const startHour = parseInt(startTime.split(':')[0], 10);
-      const nextHour = startHour + 1;
-      
-      const effectiveStartTime = startTime;
-      const effectiveEndTime = nextHour === 24 ? '24:00' : `${nextHour.toString().padStart(2, '0')}:00`;
-      const realEndTime = nextHour === 24 ? '00:00' : effectiveEndTime;
+      let bStart = parseInt(startTime.split(':')[0], 10);
+      let bEnd = bStart + 1;
 
-      // Validation using String Comparison (Midnight safe)
-      if (effectiveStartTime < courtOpen || effectiveEndTime > courtClose) {
-        throw new BadRequestException(`Khung giờ ${startTime}-${realEndTime} nằm ngoài giờ hoạt động (${courtOpen}-${court.closingTime})`);
+      if (bStart < cOpen && cClose > 24) {
+        bStart += 24;
+        bEnd += 24;
       }
 
-      return { startTime, endTime: realEndTime };
+      if (bStart < cOpen || bEnd > cClose) {
+        const realEndHour = (bStart + 1) % 24;
+        const realEndTime = `${realEndHour.toString().padStart(2, '0')}:00`;
+        throw new BadRequestException(
+          `Khung giờ ${startTime}-${realEndTime} nằm ngoài giờ hoạt động (${courtOpen}-${court.closingTime})`,
+        );
+      }
+
+      const realEndHour = bEnd % 24;
+      const formattedEndTime = `${realEndHour.toString().padStart(2, '0')}:00`;
+
+      return { startTime, endTime: formattedEndTime };
     });
 
-    // 2. Concurrency Protection
     const existing = await this.prisma.booking.findMany({
       where: {
         courtId,
         bookingDate,
-        startTime: { in: finalBookings.map(b => b.startTime) },
+        startTime: { in: finalBookings.map((b) => b.startTime) },
         status: { not: BookingStatus.CANCELLED },
       },
     });
 
     if (existing.length > 0) {
       const bookedSlots = existing.map((b) => b.startTime).join(', ');
-      throw new ConflictException(`Các khung giờ sau đã được đặt: ${bookedSlots}`);
+      throw new ConflictException(
+        `Các khung giờ sau đã được đặt: ${bookedSlots}`,
+      );
     }
 
-    // 3. Atomic creation
     const pricePerSlot = totalPrice / finalBookings.length;
 
     return this.prisma.$transaction(
@@ -152,8 +182,8 @@ export class BookingService {
     return this.prisma.booking.findMany({
       where: { userId },
       include: { court: true },
-      orderBy: { 
-        bookingDate: 'desc'
+      orderBy: {
+        bookingDate: 'desc',
       },
     });
   }
@@ -173,6 +203,137 @@ export class BookingService {
 
     if (booking.status === BookingStatus.CANCELLED) {
       throw new BadRequestException('Lịch này đã được hủy trước đó');
+    }
+
+    return this.prisma.booking.update({
+      where: { id },
+      data: { status: BookingStatus.CANCELLED },
+    });
+  }
+
+  // --- Admin Methods with Isolation ---
+
+  async findAllAdmin(
+    userId: string,
+    page = 1,
+    limit = 10,
+    search = '',
+    status?: BookingStatus,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const skip = (page - 1) * limit;
+
+    // STRICT ISOLATION: Only bookings for courts owned by this user
+    const where: Prisma.BookingWhereInput = {
+      court: { ownerId: userId },
+    };
+
+    if (status) {
+      where.status = status;
+    }
+
+    // Date Range Filtering
+    if (startDate || endDate) {
+      const dateFilter: Prisma.StringFilter = {};
+      if (startDate) dateFilter.gte = startDate;
+      if (endDate) dateFilter.lte = endDate;
+      where.bookingDate = dateFilter;
+    }
+
+    if (search.trim()) {
+      where.OR = [
+        {
+          user: {
+            fullName: { contains: search, mode: 'insensitive' },
+          },
+        },
+        {
+          user: {
+            phone: { contains: search },
+          },
+        },
+        {
+          court: {
+            name: { contains: search, mode: 'insensitive' },
+          },
+        },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.booking.findMany({
+        where,
+        include: {
+          user: {
+            select: { id: true, fullName: true, phone: true, email: true },
+          },
+          court: {
+            select: { id: true, name: true, location: true },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.booking.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        lastPage: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async confirmBooking(id: string, ownerId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: { court: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Không tìm thấy đơn đặt sân');
+    }
+
+    // Ownership check
+    if (booking.court.ownerId !== ownerId) {
+      throw new ForbiddenException('Bạn không có quyền xác nhận đơn hàng này');
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException(
+        'Chỉ có thể xác nhận đơn hàng đang ở trạng thái chờ',
+      );
+    }
+
+    return this.prisma.booking.update({
+      where: { id },
+      data: { status: BookingStatus.CONFIRMED },
+    });
+  }
+
+  async cancelBookingAdmin(id: string, ownerId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: { court: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Không tìm thấy đơn đặt sân');
+    }
+
+    // Ownership check
+    if (booking.court.ownerId !== ownerId) {
+      throw new ForbiddenException('Bạn không có quyền hủy đơn hàng này');
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new BadRequestException('Đơn hàng này đã được hủy trước đó');
     }
 
     return this.prisma.booking.update({

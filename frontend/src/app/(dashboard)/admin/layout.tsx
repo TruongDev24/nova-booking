@@ -29,6 +29,9 @@ export default function AdminLayout({
 
   const handleLogout = () => {
     Cookies.remove("access_token");
+    sessionStorage.clear();
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
     router.push("/login");
   };
 

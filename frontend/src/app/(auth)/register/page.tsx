@@ -103,10 +103,10 @@ export default function RegisterPage() {
       const userRole = user?.role || data.role; // Fallback to form role
 
       if (token) {
-        Cookies.set("access_token", token, { expires: 1, path: "/" });
-        localStorage.setItem("access_token", token);
+        Cookies.set("access_token", token, { path: "/" });
+        sessionStorage.setItem("access_token", token);
         if (user) {
-          localStorage.setItem("user", JSON.stringify(user));
+          sessionStorage.setItem("user", JSON.stringify(user));
         }
       }
 

@@ -30,6 +30,9 @@ export default function UserLayout({
 
   const handleLogout = () => {
     Cookies.remove("access_token");
+    sessionStorage.clear();
+    localStorage.removeItem("access_token"); // Clean up any old persistent tokens
+    localStorage.removeItem("user");
     router.push("/login");
   };
 

@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   Zap,
   Star,
-  Users
+  Users,
+  AlertCircle
 } from "lucide-react";
 import { courtService, Court } from "@/services/court.service";
 import { bookingService, TimeSlot } from "@/services/booking.service";
@@ -64,10 +65,11 @@ export default function CourtDetailPage({ params }: PageProps) {
       }
     };
     fetchData();
-  }, [id]); // Only run once on mount
+  }, [id, fetchSlots]); 
 
   useEffect(() => {
-    fetchSlots();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchSlots();
     setSelectedSlots([]); // Reset selection when date changes
   }, [selectedDate, fetchSlots]);
 
@@ -101,10 +103,11 @@ export default function CourtDetailPage({ params }: PageProps) {
       toast.success("Đặt lịch thành công!");
       setSelectedSlots([]);
       await fetchSlots();
-    } catch (error: any) {
-      const message = error.response?.data?.message || "Đặt sân thất bại. Vui lòng thử lại.";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string }, status?: number } };
+      const message = err.response?.data?.message || "Đặt sân thất bại. Vui lòng thử lại.";
       toast.error(message);
-      if (error.response?.status === 401) {
+      if (err.response?.status === 401) {
         router.push("/login");
       }
     } finally {
@@ -271,42 +274,52 @@ export default function CourtDetailPage({ params }: PageProps) {
                     </div>
 
                     {slotsLoading ? (
-                      <div className="grid grid-cols-3 gap-3 animate-pulse">
-                        {[1,2,3,4,5,6].map(i => (
+                      <div className="grid grid-cols-4 gap-3 animate-pulse">
+                        {[...Array(12)].map((_, i) => (
                           <div key={i} className="h-16 bg-slate-100 rounded-2xl"></div>
                         ))}
                       </div>
-                    ) : slots.length > 0 ? (
-                      <div className="grid grid-cols-3 gap-3">
+                    ) : (
+                      <div className="grid grid-cols-4 gap-2">
                         {slots.map((slot) => {
                           const isSelected = selectedSlots.includes(slot.startTime);
+                          const isDisabled = slot.isBooked || slot.isPast || slot.isClosed;
+                          
+                          // Determine status text and style
+                          let statusText = "Trống";
+                          let styleClasses = "bg-white border-slate-100 text-slate-700 hover:border-blue-500 hover:shadow-md";
+                          
+                          if (slot.isClosed) {
+                            statusText = "Đóng cửa";
+                            styleClasses = "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60";
+                          } else if (slot.isBooked) {
+                            statusText = "Đã đặt";
+                            styleClasses = "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed";
+                          } else if (slot.isPast) {
+                            statusText = "Đã qua";
+                            styleClasses = "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-80";
+                          } else if (isSelected) {
+                            styleClasses = "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 -translate-y-1";
+                            statusText = "Đã chọn";
+                          }
+
                           return (
                             <button
                               key={slot.startTime}
-                              disabled={slot.isBooked}
-                              onClick={() => toggleSlot(slot.startTime, slot.isBooked)}
+                              disabled={isDisabled}
+                              onClick={() => toggleSlot(slot.startTime, isDisabled)}
                               className={`
-                                relative py-4 px-1 rounded-2xl text-xs font-black transition-all duration-300 border-2 flex flex-col items-center justify-center gap-1 group
-                                ${slot.isBooked 
-                                  ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed" 
-                                  : isSelected
-                                    ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200 -translate-y-1"
-                                    : "bg-white border-slate-100 text-slate-700 hover:border-blue-500 hover:shadow-md"
-                                }
+                                relative py-3 px-1 rounded-xl text-xs font-black transition-all duration-300 border-2 flex flex-col items-center justify-center gap-0.5 group
+                                ${styleClasses}
                               `}
                             >
                               <span className="text-sm">{slot.startTime}</span>
-                              <span className={`text-[9px] uppercase tracking-tighter opacity-70 ${isSelected ? "text-blue-100" : "text-slate-400"}`}>
-                                {slot.isBooked ? "Đã đặt" : isSelected ? "Đã chọn" : "Trống"}
+                              <span className={`text-[8px] uppercase tracking-tighter opacity-70 ${isSelected ? "text-blue-100" : ""}`}>
+                                {statusText}
                               </span>
                             </button>
                           );
                         })}
-                      </div>
-                    ) : (
-                      <div className="py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-                         <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sân đã đóng cửa</p>
                       </div>
                     )}
                   </div>
@@ -315,18 +328,22 @@ export default function CourtDetailPage({ params }: PageProps) {
 
               {/* Summary & Legend */}
               <div className="flex flex-col gap-4 px-4">
-                 <div className="flex items-center justify-center gap-6">
+                 <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-slate-200"></div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Đã đặt</span>
+                      <div className="w-3 h-3 rounded-md bg-slate-100 border border-slate-200 opacity-60"></div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Đóng cửa</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                      <div className="w-3 h-3 rounded-md bg-slate-50 border border-slate-100"></div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Đã đặt / Đã qua</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-md bg-blue-600"></div>
                       <span className="text-[10px] font-black text-slate-400 uppercase">Đang chọn</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-white border border-slate-200"></div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Trống</span>
+                      <div className="w-3 h-3 rounded-md bg-white border-2 border-slate-100"></div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Còn trống</span>
                     </div>
                  </div>
               </div>

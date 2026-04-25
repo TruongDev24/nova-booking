@@ -11,7 +11,7 @@ export default function ExploreCourtsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const fetchCourts = async (search = "") => {
+  const fetchCourts = React.useCallback(async (search = "") => {
     try {
       setIsLoading(true);
       // Lấy 6 sân nổi bật nhất (limit=6)
@@ -23,11 +23,12 @@ export default function ExploreCourtsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchCourts();
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchCourts();
+  }, [fetchCourts]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

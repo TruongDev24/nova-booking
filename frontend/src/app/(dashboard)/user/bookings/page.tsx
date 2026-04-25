@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { bookingService } from "@/services/booking.service";
 import { toast, Toaster } from "react-hot-toast";
+import { formatToVietnamDate } from "@/utils/date-format";
 
 interface Booking {
   id: string;
@@ -37,7 +38,7 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchBookings = async () => {
+  const fetchBookings = React.useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await bookingService.getMyBookings();
@@ -48,11 +49,12 @@ export default function MyBookingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchBookings();
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchBookings();
+  }, [fetchBookings]);
 
   const handleCancel = async (id: string) => {
     if (!window.confirm("Bạn có chắc chắn muốn hủy lịch đặt này không?")) return;
@@ -61,8 +63,9 @@ export default function MyBookingsPage() {
       await bookingService.cancelBooking(id);
       toast.success("Hủy lịch thành công");
       fetchBookings();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Không thể hủy lịch");
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || "Không thể hủy lịch");
     }
   };
 
@@ -155,7 +158,7 @@ export default function MyBookingsPage() {
                     <div className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
                       <Calendar className="w-3 h-3" /> Ngày chơi
                     </div>
-                    <div className="font-bold text-slate-700">{booking.bookingDate}</div>
+                    <div className="font-bold text-slate-700">{formatToVietnamDate(booking.bookingDate)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5">

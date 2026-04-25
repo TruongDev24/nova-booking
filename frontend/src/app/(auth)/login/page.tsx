@@ -51,9 +51,9 @@ export default function LoginPage() {
 
       const { access_token, user } = response.data;
 
-      // Save token to both localStorage and Cookies (for Middleware compatibility)
-      localStorage.setItem("access_token", access_token);
-      Cookies.set("access_token", access_token, { expires: 1 }); // 1 day
+      // Save token to both sessionStorage and Cookies (for Middleware compatibility)
+      sessionStorage.setItem("access_token", access_token);
+      Cookies.set("access_token", access_token); // Session cookie (expires when browser closes)
 
       toast.success("Login successful! Redirecting...");
 
