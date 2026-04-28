@@ -7,7 +7,6 @@
 
 **Nova Booking** is a high-performance, full-stack platform designed to revolutionize how sports facilities manage their operations and how players book their favorite courts. Featuring a data-driven dashboard for owners and a seamless, real-time booking experience for customers, it ensures maximum efficiency and user satisfaction.
 
-![Banner Image](https://via.placeholder.com/1200x400.png?text=Nova+Booking+-+Full-stack+Court+Management+System)
 
 ---
 
@@ -49,15 +48,6 @@
 *   ![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) **Jest** (Unit Testing)
 *   ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white) **CI/CD Pipeline**
 
----
-
-## 📸 Screenshots / Demo
-
-![Dashboard UI](https://via.placeholder.com/800x450.png?text=Advanced+Analytics+Dashboard+Preview)
-*The Admin Dashboard showcasing revenue charts, peak hours, and VIP customer tables.*
-
-![Booking UI](https://via.placeholder.com/800x450.png?text=Real-time+Booking+Grid+Preview)
-*The Customer Booking interface featuring the interactive 24-hour time-slot grid.*
 
 ---
 
