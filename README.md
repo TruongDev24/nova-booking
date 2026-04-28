@@ -1,131 +1,164 @@
-# NOVA-booking - Hệ Thống Đặt Sân Thể Thao Đa Nền Tảng (Professional Badminton Court Booking System)
+# 🏸 Nova Booking - Court Management System
 
-![NodeJS](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
-![Next JS](https://img.shields.io/badge/Next-black?style=for-the-badge&logo=next.js&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2CA5E0?style=for-the-badge&logo=docker&logoColor=white)
+[![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/TruongDev24/nova-booking/ci.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/TruongDev24/nova-booking/actions)
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-Chào mừng bạn đến với **NOVA-booking**, nền tảng đặt sân thể thao bảo mật cao cấp (được thiết kế mô phỏng mô hình doanh nghiệp kinh doanh Sân Cầu Lông). Ứng dụng cung cấp trọn vẹn một quy trình luồng vận hành từ Khách Hàng, Đặt Sân, Thanh Toán, đến Hệ thống quản lý toàn diện dành cho Quản trị viên.
+**Nova Booking** is a high-performance, full-stack platform designed to revolutionize how sports facilities manage their operations and how players book their favorite courts. Featuring a data-driven dashboard for owners and a seamless, real-time booking experience for customers, it ensures maximum efficiency and user satisfaction.
 
----
-
-## 🛠 Ngăn Xếp Công Nghệ (Tech Stack)
-
-### Backend (Lõi Hệ Thống)
-- **Framework**: [NestJS](https://nestjs.com/) (Kiến trúc Module chặt chẽ, tối ưu tính mở rộng với Node.js)
-- **Database & ORM**: PostgreSQL & [Prisma](https://www.prisma.io/) (Type-safe Queries)
-- **Security**: JWT Authentication, Custom Guards, xác thực DTO linh hoạt, mật khẩu băm mã hoá `bcrypt`.
-
-### Frontend (Giao Diện Khách Hàng)
-- **Framework**: [Next.js 14/15](https://nextjs.org/) (Sử dụng App Router hiện đại triệt để)
-- **Giao diện**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Ngôn ngữ**: TypeScript 100%.
-
-### Infrastructure (Kiến Trúc Hạ Tầng)
-- **Kiến trúc**: Full-stack Monorepo.
-- **Docker**: Triển khai đóng gói qua Multi-stage Docker Builds và Docker Compose. Mọi Container hoạt động biệt lập tại mác mạng ảo `nova-network`.
+![Banner Image](https://via.placeholder.com/1200x400.png?text=Nova+Booking+-+Full-stack+Court+Management+System)
 
 ---
 
-## 🗄️ Kiến Trúc Cơ Sở Dữ Liệu (Database Architecture)
+## 🌟 Key Features
 
-Cơ sở dữ liệu của chúng tôi được thiết kế nâng cao, giám sát gắt gao quá trình đồng bộ luồng Book sân và Thanh toán để tránh sai sót doanh thu:
+### 👑 Admin / Owner Dashboard
+*   **Advanced Analytics**: Real-time visualization of Revenue trends, Occupancy Rates, and Cancellation metrics.
+*   **Peak Hours Heatmap**: Identify "Golden Hours" through dynamic bar charts to optimize court availability.
+*   **VIP Customer Tracking**: Automated identification of high-value customers based on spending and booking volume.
+*   **Court & Slot Control**: Full CRUD management for courts, amenities, and image galleries with a robust 24-hour slot generation system.
 
-### Các Thực Thể Chính Lõi (Core Models)
-- **User (Tài khoản)**: Quản lý khách hàng và phân quyền bảo mật qua Enums `ADMIN`, `USER`, hoặc `COURT_MANAGER`. Lưu trữ lịch sử `Booking`, `Payment`, và `Review`.
-- **Court (Sân thi đấu)**: Chứa thông tin vật lý khu vực sân, Giờ mở cửa/Đóng cửa (`openingTime`, `closingTime`), đặc quyền tiện nghi (`amenities`) thông qua mảng mảng String Arrays chuẩn PostgreSQL và Cờ đánh dấu vô hiệu hóa (Soft-delete). 
-- **Booking (Đơn Đặt Sân - Cốt lõi)**: Kết liên kết quan hệ tỷ lệ (`1-N`) giữa `User` và `Court`. Chứa khung thời gian (`startTime`, `endTime`), tổng chi phí, theo dõi luồng giao dịch `BookingStatus` (`PENDING`, `CONFIRMED`, `CANCELLED`). Thiết lập **Compound Index** `@@index([startTime, endTime])` chống chịu tra cứu cắt ca/trùng lặp giờ lịch cao điểm trên hệ thống.
-- **Payment (Giao Dịch Hóa Đơn)**: Nối kết `1-1` cực nghiêm ngặt với `Booking`. Ghi chú chính xác lưu lượng tiền nạp vô ứng dụng thông qua biên lai giao dịch, trạng thái phân đoạn `UNPAID`, `PARTIAL_PAID`, `PAID` qua các cổng chuyển biến `CASH`, `E_WALLET`,...
-- **Review (Đánh Giá)**: Các điểm số, comment được ghi qua mối nối `Court` và `User`.
-
-Cấu trúc DB này chặn đứt nguy cơ sai hỏng dữ liệu khi lượng lớn Traffic xả bộ máy query check khoảng hở giờ chơi trống tại các sân thể thao.
-
----
-
-## 📁 Tổ Chức Thư Mục (Project Structure)
-
-Dự án cấu trúc theo Monorepo để dễ dàng liên kết dữ liệu giữa các luồng:
-
-```text
-NOVA_booking/                  # Mạng lưới dự án chính
-├── docker-compose.yml         # Trung tâm khởi tạo Data và Containers đồng nhất
-├── nova-booking-backend/      # Tầng Server-API (NestJS Application)
-│   ├── Dockerfile             # Multi-stage image build (Giảm dụng lượng tải Production)
-│   ├── .env                   # Tham số môi trường DB nội bộ JWT
-│   ├── prisma/                
-│   │   └── schema.prisma      # Hồ sơ định chế CSDL DB
-│   └── src/                   # Tập con Code xử lý (App Module, Prisma Module, Auth Module, Court CRUD...)
-└── frontend/                  # Tầng Client-UI (Next.js Application)
-    ├── Dockerfile             # Standalone production container build
-    ├── src/app/               # Hệ sinh thái Pages / Routing
-    ├── public/                # Tài nguyên Media
-    └── next.config.ts         # Setting lõi Output Build
-```
+### 👤 Customer Experience
+*   **Real-time Booking**: Interactive 24-hour time-slot grid with instant availability status (Booked, Past, Closed).
+*   **Timezone-Aware Validation**: Strict backend enforcement of the **Asia/Ho_Chi_Minh** (UTC+7) timezone for all scheduling logic.
+*   **Smart Conflict Prevention**: Atomic database transactions to ensure zero double-bookings or overlapping schedules.
+*   **Booking History**: Personalized dashboard to track upcoming games and past performance.
 
 ---
 
-## 🔧 Yêu Cầu Cài Đặt (Prerequisites)
+## 💻 Tech Stack
 
-Hãy chắc chắn máy tính hoặc máy chủ của bạn đã có:
-- **Node.js**: Phiên bản 18+ (Dành cho việc dev riêng lẻ ngoài Docker).
-- **Docker & Docker Compose**: Thiết lập Hạ Tầng.
-- **Git**
+### 🎨 Frontend
+*   ![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB) **React 19**
+*   ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=nextdotjs&logoColor=white) **Next.js 15 (App Router)**
+*   ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white) **Tailwind CSS**
+*   ![Recharts](https://img.shields.io/badge/Recharts-22b5bf?style=flat-square) **Recharts** (SVG Charts)
+
+### ⚙️ Backend
+*   ![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat-square&logo=nestjs&logoColor=white) **NestJS**
+*   ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) **Prisma ORM**
+*   ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) **Passport & JWT Authentication**
+*   ![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=flat-square&logo=cloudinary&logoColor=white) **Cloudinary SDK** (Media Storage)
+
+### 🗄️ Database
+*   ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white) **PostgreSQL**
+
+### 🛠️ DevOps & QA
+*   ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) **Docker Compose**
+*   ![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) **Jest** (Unit Testing)
+*   ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white) **CI/CD Pipeline**
 
 ---
 
-## 🚀 Hướng Dẫn Bắt Đầu (Getting Started)
+## 📸 Screenshots / Demo
 
-Nếu không muốn chạy qua Docker Compose All-in-One sẵn có, bạn có thể triển khai hệ thống nội bộ thông qua các luồng cơ bản sau:
+![Dashboard UI](https://via.placeholder.com/800x450.png?text=Advanced+Analytics+Dashboard+Preview)
+*The Admin Dashboard showcasing revenue charts, peak hours, and VIP customer tables.*
 
-### 1. Khởi chạy Database
-Kích hoạt máy chủ PostgreSQL thông qua Docker bằng một lệnh duy nhất ở thư mục gốc:
+![Booking UI](https://via.placeholder.com/800x450.png?text=Real-time+Booking+Grid+Preview)
+*The Customer Booking interface featuring the interactive 24-hour time-slot grid.*
+
+---
+
+## 🚀 Getting Started (Local Development)
+
+### Prerequisites
+*   **Node.js** (v18.x or v20.x)
+*   **Docker Desktop** (for database and storage services)
+
+### Installation
 ```bash
-docker-compose up db -d
-```
-Cơ sở dữ liệu lúc này sẽ lắng nghe tại cổng `5435/5432` tuỳ map volume của bạn.
+# Clone the repository
+git clone https://github.com/TruongDev24/nova-booking.git
+cd nova-booking
 
-### 2. Thiết lập Backend (API Lõi)
-Trỏ cấu trúc Prisma Sync lên Postgres DB thực tế của bạn:
-```bash
+# Install Backend dependencies
 cd nova-booking-backend
 npm install
-npx prisma migrate dev --name init
-```
-Chạy Server API:
-```bash
-npm run start:dev
-```
-*(Backend Server mở ở đường truyền TCP `http://localhost:3001`)*
 
-### 3. Thiết lập Frontend
-Triển khai khởi dựng Next.js ở cổng mặc định `3000`:
-```bash
-cd frontend
+# Install Frontend dependencies
+cd ../frontend
 npm install
+```
+
+### Environment Variables
+Create a `.env` file in `nova-booking-backend`:
+```env
+# Database connection
+DATABASE_URL="postgresql://user:password@localhost:5432/nova_db?schema=public"
+
+# Authentication
+JWT_SECRET="generate_a_secure_long_secret_here"
+
+# Cloudinary Storage
+CLOUDINARY_NAME="your_cloud_name"
+CLOUDINARY_API_KEY="your_api_key"
+CLOUDINARY_API_SECRET="your_api_secret"
+```
+
+### Run the App
+```bash
+# 1. Start the PostgreSQL database
+docker-compose up -d
+
+# 2. Synchronize database schema (Backend)
+cd nova-booking-backend
+npx prisma migrate dev
+
+# 3. Start Backend server (runs on Port 3001)
+npm run start:dev
+
+# 4. Start Frontend server (runs on Port 3000)
+cd ../frontend
 npm run dev
 ```
 
 ---
 
-## 🔐 Tham Số Môi Trường (`.env`)
+## 🧪 Testing & CI/CD
 
-Phía bên trong thư mục Backend (`nova-booking-backend`), bạn bắt buộc sở hữu file `.env` theo chuẩn mẫu dưới đây:
+### Automated Testing
+We maintain high code reliability through automated test suites:
+*   **Unit Tests**: Run `npm run test` in the backend to execute business logic validation (using Jest Mocking and FakeTimers).
+*   **Linting**: Run `npm run lint` to ensure code style compliance across the workspace.
 
-```env
-# Chuỗi kết nối trực tiếp đến PostgreSQL Docker Host (Nếu run Native: sửa `db:5432` về `localhost:5432`/`5435`)
-DATABASE_URL="postgresql://root:rootpassword@localhost:5432/nova_booking_db?schema=public"
+### CI/CD Pipeline
+Our **GitHub Actions** pipeline automatically validates every push to the `main` branch:
+1.  **Linting**: Verifies code standards.
+2.  **Type-checking**: Runs `tsc` to ensure zero type errors.
+3.  **Testing**: Executes the entire unit test suite.
+4.  **Building**: Validates that both Next.js and NestJS build successfully for production.
 
-# Chìa khóa riêng tư cung cấp bảo mật HMAC khi Backend ký Tokens.
-JWT_SECRET="super-secret-key-for-jwt"
-```
+---
 
-Tương tự tại `frontend`, hãy chắc chắn bạn cắm biến URL Backend vào file `.env` nếu có file custom fetch URL:
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
+## 📂 Folder Structure
+
+```text
+nova-booking/
+├── frontend/                # Next.js Application
+│   ├── src/
+│   │   ├── app/             # App Router pages and layouts
+│   │   ├── services/        # API communication layer (Axios)
+│   │   ├── components/      # Reusable UI components (Recharts, etc.)
+│   │   └── utils/           # Timezone and formatting helpers
+│   └── public/              # Static assets
+├── nova-booking-backend/    # NestJS API
+│   ├── src/
+│   │   ├── auth/            # JWT, Passport strategies, and Guards
+│   │   ├── booking/         # Booking logic & 24h slot generation
+│   │   ├── court/           # Court management and Cloudinary upload
+│   │   ├── analytics/       # Data aggregation and stats logic
+│   │   └── prisma/          # Prisma Service and Client
+│   └── prisma/              # Schema definitions and migrations
+└── docker-compose.yml       # Shared infrastructure (Postgres)
 ```
 
 ---
-*NOVA-booking được định hướng kiến trúc hóa chuyên nghiệp. Mọi vấn đề lỗi xung đột hoặc đóng góp Pull-request đều được chào đón!*
+
+## ✍️ Author & License
+
+*   **Author**: [TruongDev24](https://github.com/TruongDev24)
+*   **License**: This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+
+**Built with precision and passion for the sports community.**

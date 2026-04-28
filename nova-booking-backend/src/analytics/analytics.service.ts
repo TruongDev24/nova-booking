@@ -1,18 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingStatus } from '@prisma/client';
-import { AnalyticsResponse, VipCustomer } from './interfaces/analytics-response.interface';
+import {
+  AnalyticsResponse,
+  VipCustomer,
+} from './interfaces/analytics-response.interface';
 
 @Injectable()
 export class AnalyticsService {
   constructor(private prisma: PrismaService) {}
 
-  async getAdminAnalytics(userId: string, period: number = 7): Promise<AnalyticsResponse> {
+  async getAdminAnalytics(
+    userId: string,
+    period: number = 7,
+  ): Promise<AnalyticsResponse> {
     // VN Time adjustment (UTC+7)
     const VN_OFFSET = 7 * 60 * 60 * 1000;
     const now = new Date();
     const todayVN = new Date(now.getTime() + VN_OFFSET);
-    
+
     const endDate = new Date(todayVN);
     const startDate = new Date(todayVN);
     startDate.setDate(todayVN.getDate() - period + 1);
@@ -71,7 +77,9 @@ export class AnalyticsService {
         ? (totalBookedHours / totalAvailableSlots) * 100
         : 0;
     const cancelRate =
-      bookings.length > 0 ? (cancelledBookings.length / bookings.length) * 100 : 0;
+      bookings.length > 0
+        ? (cancelledBookings.length / bookings.length) * 100
+        : 0;
 
     // 3. Revenue Chart Data (Daily)
     const revenueMap = new Map<string, number>();
@@ -164,4 +172,3 @@ export class AnalyticsService {
     };
   }
 }
-

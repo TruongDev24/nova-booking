@@ -3,7 +3,7 @@ import { BookingService } from '../../src/booking/booking.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
-import { PrismaClient, BookingStatus } from '@prisma/client';
+import { PrismaClient, BookingStatus, Court, Booking } from '@prisma/client';
 
 describe('BookingService', () => {
   let service: BookingService;
@@ -20,10 +20,7 @@ describe('BookingService', () => {
 
     prisma = mockDeep<PrismaClient>();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        BookingService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [BookingService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<BookingService>(BookingService);
@@ -36,24 +33,32 @@ describe('BookingService', () => {
   });
 
   describe('createMultiBooking', () => {
-    const mockCourt = {
+    const mockCourt: Court = {
       id: mockCourtId,
       name: 'Professional Court',
       location: 'HCM',
       pricePerHour: 100000,
       openingTime: '05:00',
       closingTime: '22:00',
+      description: '',
+      amenities: [],
+      images: [],
       ownerId: 'owner-id',
       isDeleted: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     it('1. Happy Path (Success): User books a valid available future slot', async () => {
       // Mock Court: Open 05:00-22:00
-      prisma.court.findUnique.mockResolvedValue(mockCourt as any);
+      prisma.court.findUnique.mockResolvedValue(mockCourt);
       // Mock No Double Booking
       prisma.booking.findMany.mockResolvedValue([]);
       // Mock Transaction
-      prisma.$transaction.mockImplementation(async (promises: any) => promises);
+      prisma.$transaction.mockImplementation(
+        async (callback: (tx: any) => Promise<unknown>) =>
+          await callback(prisma),
+      );
 
       const dto = {
         courtId: mockCourtId,
@@ -65,6 +70,7 @@ describe('BookingService', () => {
       await service.createMultiBooking(dto, mockUserId);
 
       // Verify prisma.booking.create was called inside transaction
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.booking.create).toHaveBeenCalledWith({
         data: {
           courtId: mockCourtId,
@@ -79,7 +85,7 @@ describe('BookingService', () => {
     });
 
     it('2. Validation: Past Time Booking (The "Time Travel" Bug)', async () => {
-      prisma.court.findUnique.mockResolvedValue(mockCourt as any);
+      prisma.court.findUnique.mockResolvedValue(mockCourt);
 
       const dto = {
         courtId: mockCourtId,
@@ -89,14 +95,17 @@ describe('BookingService', () => {
       };
 
       await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(
-        new BadRequestException('Khung giờ 08:00 đã trôi qua. Vui lòng chọn khung giờ khác.'),
+        new BadRequestException(
+          'Khung giờ 08:00 đã trôi qua. Vui lòng chọn khung giờ khác.',
+        ),
       );
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.booking.create).not.toHaveBeenCalled();
     });
 
     it('3. Validation: Outside Operating Hours (The "Closed" Bug)', async () => {
-      prisma.court.findUnique.mockResolvedValue(mockCourt as any);
+      prisma.court.findUnique.mockResolvedValue(mockCourt);
 
       const dto = {
         courtId: mockCourtId,
@@ -109,14 +118,15 @@ describe('BookingService', () => {
         BadRequestException,
       );
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.booking.create).not.toHaveBeenCalled();
     });
 
     it('4. Validation: Double Booking / Conflict', async () => {
-      prisma.court.findUnique.mockResolvedValue(mockCourt as any);
+      prisma.court.findUnique.mockResolvedValue(mockCourt);
       // Mock existing booking
       prisma.booking.findMany.mockResolvedValue([
-        { startTime: '19:00' } as any,
+        { startTime: '19:00' } as unknown as Booking,
       ]);
 
       const dto = {
@@ -130,6 +140,7 @@ describe('BookingService', () => {
         new ConflictException('Các khung giờ sau đã được đặt: 19:00'),
       );
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.booking.create).not.toHaveBeenCalled();
     });
 
@@ -140,9 +151,12 @@ describe('BookingService', () => {
         openingTime: '23:00',
         closingTime: '22:00',
       };
-      prisma.court.findUnique.mockResolvedValue(crossDayCourt as any);
+      prisma.court.findUnique.mockResolvedValue(crossDayCourt);
       prisma.booking.findMany.mockResolvedValue([]);
-      prisma.$transaction.mockImplementation(async (promises: any) => promises);
+      prisma.$transaction.mockImplementation(
+        async (callback: (tx: any) => Promise<unknown>) =>
+          await callback(prisma),
+      );
 
       const dto = {
         courtId: mockCourtId,
@@ -156,13 +170,15 @@ describe('BookingService', () => {
       // Let's use April 26 02:00 AM VN.
       const futureDto = {
         ...dto,
-        bookingDate: '2026-04-26', 
+        bookingDate: '2026-04-26',
       };
 
       await service.createMultiBooking(futureDto, mockUserId);
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.booking.create).toHaveBeenCalledWith(
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           data: expect.objectContaining({
             bookingDate: '2026-04-26',
             startTime: '02:00',
