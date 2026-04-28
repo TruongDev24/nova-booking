@@ -106,23 +106,6 @@ export class CourtService {
     return court;
   }
 
-  async getSchedule(courtId: string, date: string) {
-    return this.prisma.booking.findMany({
-      where: {
-        courtId,
-        bookingDate: date,
-        status: { not: 'CANCELLED' },
-      },
-      select: {
-        id: true,
-        startTime: true,
-        endTime: true,
-        status: true,
-      },
-      orderBy: { startTime: 'asc' },
-    });
-  }
-
   async update(
     id: string,
     dto: UpdateCourtDto,

@@ -184,7 +184,7 @@ export default function AdminDashboard() {
                                         fontSize: '10px',
                                         textTransform: 'uppercase'
                                     }}
-                                    formatter={(value: number) => [`${value.toLocaleString()}đ`, "Doanh thu"]}
+                                    formatter={(value: number | string | undefined) => [`${Number(value || 0).toLocaleString()}đ`, "Doanh thu"]}
                                 />
                                 <Area
                                     type="monotone"
@@ -239,7 +239,7 @@ export default function AdminDashboard() {
                                         boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
                                         padding: '1rem'
                                     }}
-                                    formatter={(value: number) => [`${value.toLocaleString()}đ`, "Doanh thu"]}
+                                    formatter={(value: number | string | undefined) => [`${Number(value || 0).toLocaleString()}đ`, "Doanh thu"]}
                                     labelStyle={{
                                         fontWeight: 900,
                                         marginBottom: '0.5rem',

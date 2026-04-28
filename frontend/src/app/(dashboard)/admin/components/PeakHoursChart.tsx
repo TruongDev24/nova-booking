@@ -57,7 +57,7 @@ const PeakHoursChart: React.FC<PeakHoursChartProps> = ({ data }) => {
             <Tooltip 
               cursor={{ fill: '#f8fafc', radius: 8 }}
               contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-              formatter={(value: number) => [`${value} đơn`, "Số lượng"]}
+              formatter={(value: number | string | undefined) => [`${value ?? 0} đơn`, "Số lượng"]}
               labelStyle={{ fontWeight: 900, color: '#64748b', fontSize: '10px', marginBottom: '4px' }}
             />
             <Bar dataKey="count" radius={[8, 8, 0, 0]} animationDuration={1500}>

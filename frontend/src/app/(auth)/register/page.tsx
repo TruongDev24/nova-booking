@@ -82,6 +82,7 @@ export default function RegisterPage() {
     },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const selectedRole = watch("role");
 
   const onSubmit = async (data: RegisterFormValues) => {

@@ -34,7 +34,7 @@ const courtSchema = z.object({
     .trim()
     .min(10, "Địa chỉ phải cụ thể (ít nhất 10 ký tự)")
     .max(255, "Địa chỉ quá dài"),
-  pricePerHour: z.coerce.number()
+  pricePerHour: z.number({ message: "Giá tiền phải là số" })
     .min(0, "Giá tiền không được âm")
     .max(2000000, "Giá tiền quá lớn (tối đa 2.000.000đ)")
     .refine((val) => val % 1000 === 0, {
@@ -46,7 +46,15 @@ const courtSchema = z.object({
   amenities: z.array(z.string()).optional(),
 });
 
-type CourtFormValues = z.infer<typeof courtSchema>;
+interface CourtFormValues {
+  name: string;
+  location: string;
+  pricePerHour: number;
+  description?: string;
+  openingTime: string;
+  closingTime: string;
+  amenities?: string[];
+}
 
 export default function AdminCourtsPage() {
   const [courtsData, setCourtsData] = useState<PaginatedCourts | null>(null);
@@ -83,6 +91,7 @@ export default function AdminCourtsPage() {
     },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchAmenities = watch("amenities") || [];
 
   const fetchCourts = useCallback(async () => {
@@ -428,7 +437,7 @@ export default function AdminCourtsPage() {
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Giá thuê / Giờ (VNĐ)</label>
                   <input 
                     type="number" 
-                    {...register("pricePerHour")} 
+                    {...register("pricePerHour", { valueAsNumber: true })} 
                     className={`w-full px-5 py-3.5 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-slate-900 ${errors.pricePerHour ? 'border-red-100 focus:border-red-500' : 'border-slate-50 focus:border-blue-500 focus:bg-white'}`} 
                   />
                   {errors.pricePerHour && <div className="flex items-center gap-1.5 text-red-500 mt-2 font-bold text-[11px]"><AlertCircle className="w-3.5 h-3.5" />{errors.pricePerHour.message}</div>}

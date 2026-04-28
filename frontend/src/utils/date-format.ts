@@ -1,26 +1,4 @@
 /**
- * Formats a UTC date string into Vietnam timezone (Asia/Ho_Chi_Minh)
- * Format: HH:mm DD/MM/YYYY
- */
-export const formatToVietnamTime = (utcDateString: string | Date | undefined | null): string => {
-  if (!utcDateString) return '';
-  
-  const date = new Date(utcDateString);
-  
-  // Return empty string if invalid date
-  if (isNaN(date.getTime())) return '';
-
-  return date.toLocaleString('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-};
-
-/**
  * Formats a date string to display only the date in Vietnam timezone
  * Format: DD/MM/YYYY
  */
