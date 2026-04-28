@@ -55,9 +55,8 @@ describe('BookingService', () => {
       // Mock No Double Booking
       prisma.booking.findMany.mockResolvedValue([]);
       // Mock Transaction
-      prisma.$transaction.mockImplementation(
-        async (callback: (tx: any) => Promise<unknown>) =>
-          await callback(prisma),
+      prisma.$transaction.mockImplementation((promises: unknown[]) =>
+        Promise.resolve(promises),
       );
 
       const dto = {
@@ -153,9 +152,8 @@ describe('BookingService', () => {
       };
       prisma.court.findUnique.mockResolvedValue(crossDayCourt);
       prisma.booking.findMany.mockResolvedValue([]);
-      prisma.$transaction.mockImplementation(
-        async (callback: (tx: any) => Promise<unknown>) =>
-          await callback(prisma),
+      prisma.$transaction.mockImplementation((promises: unknown[]) =>
+        Promise.resolve(promises),
       );
 
       const dto = {
