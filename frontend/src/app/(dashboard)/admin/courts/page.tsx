@@ -4,14 +4,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import { 
   Plus, Search, Map as MapIcon, Edit, Trash2, X, Loader2, 
   Camera, Check, Wifi, Coffee, Car, ShoppingBag, 
-  ChevronLeft, ChevronRight, AlertCircle, HelpCircle,
-  AlertTriangle
+  ChevronLeft, ChevronRight, AlertCircle, HelpCircle
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { courtService, Court, PaginatedCourts } from "@/services/court.service";
 import { toast, Toaster } from "react-hot-toast";
+import Image from "next/image";
 
 // --- Configuration ---
 const AMENITIES_LIST = [
@@ -207,7 +207,7 @@ export default function AdminCourtsPage() {
         await courtService.delete(id);
         toast.success("Đã xóa sân thành công");
         fetchCourts();
-      } catch (error) {
+      } catch {
         toast.error("Không thể xóa sân. Vui lòng thử lại sau.");
       }
     }
@@ -263,7 +263,7 @@ export default function AdminCourtsPage() {
                 <div key={court.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-xl transition-all duration-300">
                   <div className="relative h-48 bg-slate-50">
                     {court.images && court.images.length > 0 ? (
-                      <img src={court.images[0]} alt={court.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <Image src={court.images[0]} alt={court.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-300">
                         <Camera className="w-10 h-10" />
@@ -391,7 +391,7 @@ export default function AdminCourtsPage() {
                 <div className="grid grid-cols-5 gap-3">
                   {previews.map((src, idx) => (
                     <div key={idx} className="aspect-square rounded-2xl border border-slate-100 overflow-hidden relative group shadow-sm">
-                      <img src={src} alt="preview" className="w-full h-full object-cover" />
+                      <Image src={src} alt="preview" fill className="object-cover" />
                     </div>
                   ))}
                   {previews.length < 5 && (

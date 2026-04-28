@@ -5,17 +5,15 @@ import {
   Calendar, 
   Clock, 
   MapPin, 
-  CreditCard, 
-  AlertCircle, 
   CheckCircle2, 
   XCircle,
   Loader2,
-  Trash2,
-  ChevronRight
+  Trash2
 } from "lucide-react";
 import { bookingService } from "@/services/booking.service";
 import { toast, Toaster } from "react-hot-toast";
 import { formatToVietnamDate } from "@/utils/date-format";
+import Image from "next/image";
 
 interface Booking {
   id: string;
@@ -121,7 +119,7 @@ export default function MyBookingsPage() {
               {/* Image Section */}
               <div className="w-full md:w-64 h-48 md:h-auto relative bg-slate-100 shrink-0">
                 {booking.court.images?.[0] ? (
-                  <img src={booking.court.images[0]} alt={booking.court.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  <Image src={booking.court.images[0]} alt={booking.court.name} fill className="object-cover transition-transform duration-500 group-hover:scale-110" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-300">
                     <MapPin className="w-8 h-8" />

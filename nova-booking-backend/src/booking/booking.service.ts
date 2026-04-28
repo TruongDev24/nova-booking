@@ -47,6 +47,9 @@ export class BookingService {
     }> = [];
 
     const now = new Date();
+    console.log('--- DEBUG TIME ---');
+    console.log('Raw Server Time (now):', now.toISOString());
+    console.log('Server Timezone Offset:', now.getTimezoneOffset());
 
     // ALWAYS generate 24 slots (00:00 to 23:00)
     for (let h = 0; h < 24; h++) {
@@ -67,8 +70,27 @@ export class BookingService {
 
       // 2. Check if Past Time (Real-time comparison)
       const [year, month, day] = date.split('-').map(Number);
-      const slotDateTime = new Date(year, month - 1, day, h, 0, 0, 0);
-      const isPast = slotDateTime < now;
+      // `date` and slot hours are interpreted as Asia/Ho_Chi_Minh (UTC+7).
+      // Convert slot time to UTC millis for a timezone-stable comparison (Docker often runs UTC).
+      const VN_UTC_OFFSET_HOURS = 7;
+      const slotUtcMs = Date.UTC(
+        year,
+        month - 1,
+        day,
+        h - VN_UTC_OFFSET_HOURS,
+        0,
+        0,
+        0,
+      );
+      const slotDateTime = new Date(slotUtcMs);
+      // If it's exactly at slot start time, slot should be considered past/closed.
+      const isPast = slotUtcMs <= now.getTime();
+
+      if (h < 3) {
+        console.log(
+          `Slot: ${startTime}, SlotDateTime: ${slotDateTime.toISOString()}, isPast: ${isPast}`,
+        );
+      }
 
       // 3. Check if Booked
       const isBooked = existingBookings.some((b) => b.startTime === startTime);
@@ -120,6 +142,10 @@ export class BookingService {
       throw new BadRequestException('Vui lòng chọn khung giờ đặt sân');
     }
 
+    const now = new Date();
+    const [year, month, day] = bookingDate.split('-').map(Number);
+    const VN_UTC_OFFSET_HOURS = 7;
+
     const finalBookings = slotsToBook.map((startTime) => {
       let bStart = parseInt(startTime.split(':')[0], 10);
       let bEnd = bStart + 1;
@@ -127,6 +153,22 @@ export class BookingService {
       if (bStart < cOpen && cClose > 24) {
         bStart += 24;
         bEnd += 24;
+      }
+
+      // Check if Past Time (Real-time comparison)
+      const slotUtcMs = Date.UTC(
+        year,
+        month - 1,
+        day,
+        (bStart % 24) - VN_UTC_OFFSET_HOURS,
+        0,
+        0,
+        0,
+      );
+      if (slotUtcMs <= now.getTime()) {
+        throw new BadRequestException(
+          `Khung giờ ${startTime} đã trôi qua. Vui lòng chọn khung giờ khác.`,
+        );
       }
 
       if (bStart < cOpen || bEnd > cClose) {

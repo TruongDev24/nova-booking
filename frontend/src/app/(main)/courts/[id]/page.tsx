@@ -19,6 +19,7 @@ import { courtService, Court } from "@/services/court.service";
 import { bookingService, TimeSlot } from "@/services/booking.service";
 import { toast, Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -188,9 +189,10 @@ export default function CourtDetailPage({ params }: PageProps) {
             
             {/* Gallery / Placeholder */}
             <div className="aspect-[16/9] w-full bg-slate-200 rounded-[2.5rem] overflow-hidden relative group shadow-2xl">
-               <img 
+               <Image 
                 src={court.images?.[0] || "https://images.unsplash.com/photo-1544033527-b192daee1f5b?q=80&w=2070&auto=format&fit=crop"} 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                fill
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
                 alt={court.name}
                />
                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>

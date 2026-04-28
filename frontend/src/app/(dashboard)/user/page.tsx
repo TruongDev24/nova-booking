@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, MapPin, Star, Clock, ArrowRight, Loader2, Image as ImageIcon } from "lucide-react";
+import { Search, MapPin, Star, Clock, ArrowRight, Image as ImageIcon } from "lucide-react";
 import { courtService, PaginatedCourts, Court } from "@/services/court.service";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
+import Image from "next/image";
 
 export default function ExploreCourtsPage() {
   const [courtsData, setCourtsData] = useState<PaginatedCourts | null>(null);
@@ -113,10 +114,11 @@ export default function ExploreCourtsPage() {
                 {/* Image Cover */}
                 <div className="relative h-64 overflow-hidden">
                   {court.images?.[0] ? (
-                    <img 
+                    <Image 
                       src={court.images[0]} 
                       alt={court.name} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      fill
+                      className="object-cover group-hover:scale-110 transition-transform duration-700"
                     />
                   ) : (
                     <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">

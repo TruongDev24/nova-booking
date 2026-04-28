@@ -3,8 +3,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { 
   Search, 
-  Filter, 
-  Calendar as CalendarIcon, 
   Clock, 
   MapPin, 
   ChevronLeft, 
@@ -16,7 +14,7 @@ import {
   Check,
   ArrowRight
 } from "lucide-react";
-import { bookingService, Booking, PaginatedBookings } from "@/services/booking.service";
+import { bookingService, PaginatedBookings } from "@/services/booking.service";
 import { toast, Toaster } from "react-hot-toast";
 import { formatToVietnamDate } from "@/utils/date-format";
 
@@ -61,7 +59,7 @@ export default function AdminBookingsPage() {
       await bookingService.cancelBookingAdmin(id);
       toast.success("Đã hủy đơn thành công");
       fetchBookings();
-    } catch (error) {
+    } catch {
       toast.error("Không thể hủy đơn. Vui lòng thử lại.");
     } finally {
       setIsCancelling(null);
@@ -78,7 +76,7 @@ export default function AdminBookingsPage() {
       await bookingService.confirmBookingAdmin(id);
       toast.success("Đã xác nhận đơn hàng!");
       fetchBookings();
-    } catch (error) {
+    } catch {
       toast.error("Không thể xác nhận đơn. Vui lòng thử lại.");
     } finally {
       setIsConfirming(null);

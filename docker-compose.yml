@@ -6,6 +6,9 @@ services:
     container_name: nova-postgres
     env_file:
       - ./nova-booking-backend/.env
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - PGTZ=Asia/Ho_Chi_Minh
     ports:
       - "5435:5432"
     volumes:
@@ -32,6 +35,7 @@ services:
       - /app/node_modules
     environment:
       - DATABASE_URL=postgresql://root:rootpassword@db:5432/nova_booking_db?schema=public
+      - TZ=Asia/Ho_Chi_Minh
     depends_on:
       db:
         condition: service_healthy
