@@ -1,15 +1,22 @@
-import React from 'react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  Cell 
-} from 'recharts';
-import { Zap } from 'lucide-react';
+import React from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+import { Zap } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface PeakHour {
   hour: string;
@@ -23,56 +30,81 @@ interface PeakHoursChartProps {
 const PeakHoursChart: React.FC<PeakHoursChartProps> = ({ data }) => {
   if (!data || data.length === 0) return null;
 
-  const maxCount = Math.max(...data.map(d => d.count));
+  const maxCount = Math.max(...data.map((d) => d.count));
 
   return (
-    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-xl h-full">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-500 fill-current" />
-            Khung giờ vàng
-          </h3>
-          <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Mật độ đặt sân theo giờ</p>
+    <Card className="border-none shadow-sm flex flex-col h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Zap className="h-5 w-5 text-amber-500 fill-current" />
+          <div>
+            <CardTitle className="text-lg font-black uppercase tracking-tight">
+              Khung giờ vàng
+            </CardTitle>
+            <CardDescription className="text-[10px] font-black uppercase tracking-widest">
+              Mật độ đơn đặt theo thời gian
+            </CardDescription>
+          </div>
         </div>
-      </div>
-
-      <div className="h-80 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis 
-              dataKey="hour" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }}
-              interval={2}
-            />
-            <YAxis 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }}
-              allowDecimals={false}
-            />
-            <Tooltip 
-              cursor={{ fill: '#f8fafc', radius: 8 }}
-              contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={(value: any) => [`${value ?? 0} đơn`, "Số lượng"]}
-              labelStyle={{ fontWeight: 900, color: '#64748b', fontSize: '10px', marginBottom: '4px' }}
-            />
-            <Bar dataKey="count" radius={[8, 8, 0, 0]} animationDuration={1500}>
-              {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={entry.count === maxCount && maxCount > 0 ? '#f59e0b' : '#e2e8f0'} 
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+      </CardHeader>
+      <CardContent>
+        <div className="h-80 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data}>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="var(--border)"
+              />
+              <XAxis
+                dataKey="hour"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 9, fontWeight: 900, fill: "var(--muted-foreground)" }}
+                interval={2}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 9, fontWeight: 900, fill: "var(--muted-foreground)" }}
+                allowDecimals={false}
+              />
+              <Tooltip
+                cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+                contentStyle={{
+                  borderRadius: "1rem",
+                  border: "1px solid var(--border)",
+                  backgroundColor: "var(--background)",
+                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                  padding: "0.75rem",
+                }}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={(value: any) => [`${value ?? 0} đơn`, "Số lượng"]}
+                labelStyle={{
+                  fontWeight: 900,
+                  color: "var(--muted-foreground)",
+                  fontSize: "9px",
+                  marginBottom: "4px",
+                  textTransform: "uppercase"
+                }}
+              />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]} animationDuration={1500}>
+                {data.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={
+                      entry.count === maxCount && maxCount > 0
+                        ? "#f59e0b"
+                        : "var(--muted)"
+                    }
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

@@ -1,149 +1,235 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { 
-  Search, 
   Clock, 
   MapPin, 
-  ChevronLeft, 
-  ChevronRight, 
-  Loader2,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   Check,
+  MoreHorizontal,
+  Search,
   ArrowRight
 } from "lucide-react";
-import { bookingService, PaginatedBookings } from "@/services/booking.service";
-import { toast, Toaster } from "react-hot-toast";
+import { bookingService, Booking } from "@/services/booking.service";
+import { toast } from "sonner";
 import { formatToVietnamDate } from "@/utils/date-format";
+import { ColumnDef } from "@tanstack/react-table";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { DataTable } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AdminBookingsPage() {
-  const [data, setData] = useState<PaginatedBookings | null>(null);
-  const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCancelling, setIsCancelling] = useState<string | null>(null);
-  const [isConfirming, setIsConfirming] = useState<string | null>(null);
+  
+  const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
+  const [bookingToConfirm, setBookingToConfirm] = useState<string | null>(null);
 
-  const fetchBookings = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const result = await bookingService.getAllAdmin(page, 10, search, status, startDate, endDate);
-      setData(result);
-    } catch (error) {
-      console.error("Fetch Bookings Error:", error);
-      toast.error("Không thể tải danh sách đơn đặt sân");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, search, status, startDate, endDate]);
+  // --- React Query: Fetch ---
+  const { data: bookingsData, isLoading } = useQuery({
+    queryKey: ["admin-bookings", search, status, startDate, endDate],
+    queryFn: () => bookingService.getAllAdmin(1, 100, search, status, startDate, endDate),
+  });
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchBookings();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [search, page, status, startDate, endDate, fetchBookings]);
+  const bookings = bookingsData?.data || [];
+  const totalCount = bookingsData?.meta.total || 0;
 
-  const handleCancel = async (id: string) => {
-    if (!window.confirm("HÀNH ĐỘNG NGUY HIỂM: Bạn có chắc chắn muốn hủy đơn đặt sân này?")) {
-      return;
-    }
-
-    try {
-      setIsCancelling(id);
-      await bookingService.cancelBookingAdmin(id);
-      toast.success("Đã hủy đơn thành công");
-      fetchBookings();
-    } catch {
-      toast.error("Không thể hủy đơn. Vui lòng thử lại.");
-    } finally {
-      setIsCancelling(null);
-    }
-  };
-
-  const handleConfirmBooking = async (id: string) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xác nhận đơn đặt sân này?")) {
-      return;
-    }
-
-    try {
-      setIsConfirming(id);
-      await bookingService.confirmBookingAdmin(id);
+  // --- React Query: Mutations ---
+  const confirmMutation = useMutation({
+    mutationFn: (id: string) => bookingService.confirmBookingAdmin(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
       toast.success("Đã xác nhận đơn hàng!");
-      fetchBookings();
-    } catch {
-      toast.error("Không thể xác nhận đơn. Vui lòng thử lại.");
-    } finally {
-      setIsConfirming(null);
-    }
-  };
+    },
+    onError: () => toast.error("Lỗi khi xác nhận đơn hàng"),
+  });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "CONFIRMED":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black border border-emerald-100 uppercase tracking-tighter shadow-sm">
-            <CheckCircle2 className="w-3 h-3" /> Thành công
-          </span>
-        );
-      case "CANCELLED":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-600 text-[10px] font-black border border-red-100 uppercase tracking-tighter shadow-sm">
-            <XCircle className="w-3 h-3" /> Đã hủy
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black border border-amber-100 uppercase tracking-tighter shadow-sm">
-            <Clock className="w-3 h-3" /> Chờ xử lý
-          </span>
-        );
-    }
-  };
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => bookingService.cancelBookingAdmin(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
+      toast.success("Đã hủy đơn thành công");
+    },
+    onError: () => toast.error("Lỗi khi hủy đơn hàng"),
+  });
 
-  const bookings = data?.data || [];
-  const meta = data?.meta;
+  const columns: ColumnDef<Booking>[] = [
+    {
+      accessorKey: "id",
+      header: "Mã đơn",
+      cell: ({ row }) => (
+        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">
+          #{row.original.id.slice(-6)}
+        </span>
+      ),
+    },
+    {
+      id: "customer",
+      header: "Khách hàng",
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-bold tracking-tight">{row.original.user?.fullName}</span>
+          <span className="text-[11px] text-muted-foreground font-medium">{row.original.user?.phone}</span>
+        </div>
+      ),
+    },
+    {
+      id: "court",
+      header: "Sân vận động",
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-bold text-foreground">{row.original.court?.name}</span>
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
+            <MapPin className="h-3 w-3" /> {row.original.court?.location}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: "schedule",
+      header: "Lịch hẹn",
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-bold">{formatToVietnamDate(row.original.bookingDate)}</span>
+          <span className="text-xs text-primary font-black uppercase tracking-tighter">
+            {row.original.startTime} - {row.original.endTime}
+          </span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "totalPrice",
+      header: () => <div className="text-right">Thanh toán</div>,
+      cell: ({ row }) => (
+        <div className="text-right font-black text-lg">
+          {row.original.totalPrice.toLocaleString()}đ
+        </div>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: () => <div className="text-center">Trạng thái</div>,
+      cell: ({ row }) => {
+        const status = row.original.status;
+        if (status === "CONFIRMED") {
+          return (
+            <div className="flex justify-center">
+              <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 font-black text-[10px] uppercase">
+                <CheckCircle2 className="mr-1.5 h-3 w-3" /> Thành công
+              </Badge>
+            </div>
+          );
+        }
+        if (status === "CANCELLED") {
+          return (
+            <div className="flex justify-center">
+              <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 font-black text-[10px] uppercase">
+                <XCircle className="mr-1.5 h-3 w-3" /> Đã hủy
+              </Badge>
+            </div>
+          );
+        }
+        return (
+          <div className="flex justify-center">
+            <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 font-black text-[10px] uppercase">
+              <Clock className="mr-1.5 h-3 w-3" /> Chờ xử lý
+            </Badge>
+          </div>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const booking = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Thao tác đơn</DropdownMenuLabel>
+                {booking.status === "PENDING" && (
+                  <DropdownMenuItem onClick={() => setBookingToConfirm(booking.id)}>
+                    <Check className="mr-2 h-4 w-4 text-emerald-500" /> Xác nhận đơn
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setBookingToCancel(booking.id)} 
+                className="text-destructive focus:text-destructive"
+                disabled={booking.status === "CANCELLED"}
+              >
+                <XCircle className="mr-2 h-4 w-4" /> Hủy đơn đặt
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-      <Toaster position="top-right" />
-      
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight italic">QUẢN LÝ ĐẶT SÂN</h1>
-          <p className="text-slate-500 text-sm font-medium">Lọc theo khoảng thời gian • Thống kê hiệu quả.</p>
+          <h1 className="text-3xl font-black tracking-tight uppercase italic">QUẢN LÝ ĐẶT SÂN</h1>
+          <p className="text-muted-foreground font-medium italic">Lọc theo khoảng thời gian • Thống kê hiệu quả.</p>
         </div>
-        <div className="bg-white px-6 py-4 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-8">
+        <div className="bg-card border rounded-2xl px-6 py-4 flex items-center gap-8 shadow-sm">
            <div className="flex flex-col text-right">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng đơn lọc được</span>
-              <span className="text-2xl font-black text-slate-900 leading-none mt-1">{meta?.total || 0}</span>
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Tổng đơn hàng</span>
+              <span className="text-3xl font-black leading-none mt-1.5">{totalCount}</span>
            </div>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-xl flex flex-col lg:flex-row items-center gap-4">
+      <div className="bg-card border p-4 rounded-[2rem] shadow-sm flex flex-col lg:flex-row items-center gap-4">
         <div className="flex-1 w-full relative">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Tìm khách hàng hoặc tên sân..." 
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Tìm theo khách hàng hoặc tên sân..." 
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-[1.5rem] outline-none focus:border-blue-500 focus:bg-white transition-all text-sm font-bold"
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 h-12 rounded-xl bg-muted/30 border-transparent focus:border-primary focus:bg-background font-bold text-sm"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
           <select 
             value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="flex-1 lg:flex-none px-6 py-4 bg-slate-50 border-2 border-transparent rounded-[1.5rem] outline-none focus:border-blue-500 font-bold text-sm cursor-pointer"
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-12 px-4 bg-muted/30 border border-transparent rounded-xl outline-none focus:border-primary font-bold text-xs cursor-pointer"
           >
             <option value="">Trạng thái</option>
             <option value="PENDING">Chờ xử lý</option>
@@ -151,152 +237,97 @@ export default function AdminBookingsPage() {
             <option value="CANCELLED">Đã hủy</option>
           </select>
 
-          <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-[1.5rem] border-2 border-transparent focus-within:border-blue-500 transition-all">
+          <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-transparent focus-within:border-primary">
              <div className="relative">
                 <input 
                   type="date" 
                   value={startDate}
-                  onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-                  className="bg-transparent pl-4 pr-2 py-3 outline-none font-bold text-xs cursor-pointer"
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-transparent pl-3 pr-1 h-10 outline-none font-bold text-[11px] cursor-pointer"
                 />
-                <span className="absolute -top-6 left-4 text-[9px] font-black text-slate-400 uppercase">Từ ngày</span>
              </div>
-             <ArrowRight className="w-3 h-3 text-slate-300" />
+             <ArrowRight className="h-3 w-3 text-muted-foreground/50" />
              <div className="relative">
                 <input 
                   type="date" 
                   value={endDate}
-                  onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-                  className="bg-transparent pl-2 pr-4 py-3 outline-none font-bold text-xs cursor-pointer"
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-transparent pl-1 pr-3 h-10 outline-none font-bold text-[11px] cursor-pointer"
                 />
-                <span className="absolute -top-6 left-2 text-[9px] font-black text-slate-400 uppercase">Đến ngày</span>
              </div>
           </div>
 
           {(search || status || startDate || endDate) && (
-            <button 
-              onClick={() => { setSearch(""); setStatus(""); setStartDate(""); setEndDate(""); setPage(1); }}
-              className="px-4 py-3 text-red-500 font-bold text-xs hover:bg-red-50 rounded-2xl transition-all"
+            <Button 
+              variant="ghost"
+              onClick={() => { setSearch(""); setStatus(""); setStartDate(""); setEndDate(""); }}
+              className="text-destructive font-black text-[10px] uppercase tracking-widest hover:bg-destructive/10"
             >
               Đặt lại
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-900 text-white">
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-60">ID</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Khách hàng</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Sân vận động</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Khung giờ</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-60 text-right">Thanh toán</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-60 text-center">Trạng thái</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-60 text-center">Xử lý đơn</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td colSpan={7} className="px-8 py-10"><div className="h-4 bg-slate-100 rounded w-full"></div></td>
-                  </tr>
-                ))
-              ) : bookings.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-8 py-32 text-center">
-                     <AlertCircle className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                     <p className="text-slate-400 font-black uppercase tracking-widest text-sm">Không tìm thấy đơn hàng trong khoảng này</p>
-                  </td>
-                </tr>
-              ) : (
-                bookings.map((booking) => (
-                  <tr key={booking.id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="px-8 py-6">
-                      <span className="text-[10px] font-black text-slate-400">#{booking.id.slice(-6).toUpperCase()}</span>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-black text-slate-900">{booking.user?.fullName}</span>
-                        <span className="text-xs text-slate-400 font-bold">{booking.user?.phone}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-700">{booking.court?.name}</span>
-                        <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
-                          <MapPin className="w-3 h-3" /> {booking.court?.location}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-900">{formatToVietnamDate(booking.bookingDate)}</span>
-                        <span className="text-xs text-blue-600 font-black">{booking.startTime} - {booking.endTime}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <span className="text-lg font-black text-slate-900">{booking.totalPrice.toLocaleString()}đ</span>
-                    </td>
-                    <td className="px-8 py-6 text-center">
-                      {getStatusBadge(booking.status)}
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center justify-center gap-2">
-                        {booking.status === "PENDING" && (
-                          <>
-                            <button 
-                              onClick={() => handleConfirmBooking(booking.id)}
-                              disabled={isConfirming === booking.id}
-                              className="p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all shadow-sm"
-                              title="Xác nhận đơn"
-                            >
-                              {isConfirming === booking.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                            </button>
-                            <button 
-                              onClick={() => handleCancel(booking.id)}
-                              disabled={isCancelling === booking.id}
-                              className="p-2.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm"
-                              title="Hủy đơn"
-                            >
-                              {isCancelling === booking.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                            </button>
-                          </>
-                        )}
-                        {booking.status === "CONFIRMED" && (
-                          <button 
-                            onClick={() => handleCancel(booking.id)}
-                            disabled={isCancelling === booking.id}
-                            className="p-2.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm"
-                            title="Hủy đơn"
-                          >
-                            {isCancelling === booking.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {meta && meta.lastPage > 1 && (
-          <div className="px-8 py-6 bg-slate-50 flex items-center justify-between">
-            <span className="text-xs font-black text-slate-400 uppercase">Hiển thị {bookings.length} / {meta.total} đơn</span>
-            <div className="flex items-center gap-4">
-              <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-3 rounded-2xl border bg-white hover:bg-slate-50 disabled:opacity-30"><ChevronLeft className="w-5 h-5" /></button>
-              <span className="text-sm font-black">TRANG {page} / {meta.lastPage}</span>
-              <button disabled={page === meta.lastPage} onClick={() => setPage(p => p + 1)} className="p-3 rounded-2xl border bg-white hover:bg-slate-50 disabled:opacity-30"><ChevronRight className="w-5 h-5" /></button>
-            </div>
+      {isLoading ? (
+        <div className="space-y-4">
+          <div className="border rounded-xl">
+             {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4 p-6 border-b last:border-0">
+                   <div className="space-y-2 flex-1">
+                      <Skeleton className="h-5 w-[60%]" />
+                      <Skeleton className="h-4 w-[30%]" />
+                   </div>
+                   <Skeleton className="h-6 w-[100px] rounded-full" />
+                   <Skeleton className="h-4 w-[80px]" />
+                </div>
+             ))}
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <DataTable columns={columns} data={bookings} />
+      )}
+
+      {/* Confirmation Dialogs */}
+      <AlertDialog open={!!bookingToCancel} onOpenChange={() => setBookingToCancel(null)}>
+        <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase">Hủy đơn đặt sân?</AlertDialogTitle>
+            <AlertDialogDescription className="font-medium">
+              Bạn có chắc chắn muốn hủy đơn này? Hành động này sẽ thông báo tới khách hàng.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="rounded-xl h-11 font-bold">Hủy bỏ</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => bookingToCancel && cancelMutation.mutate(bookingToCancel)}
+              className="rounded-xl h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold"
+            >
+              Xác nhận hủy
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!bookingToConfirm} onOpenChange={() => setBookingToConfirm(null)}>
+        <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase">Xác nhận đơn đặt?</AlertDialogTitle>
+            <AlertDialogDescription className="font-medium">
+              Xác nhận đơn này đã được khách hàng thanh toán hoặc đảm bảo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="rounded-xl h-11 font-bold">Quay lại</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => bookingToConfirm && confirmMutation.mutate(bookingToConfirm)}
+              className="rounded-xl h-11 bg-emerald-600 text-white hover:bg-emerald-700 font-bold"
+            >
+              Xác nhận ngay
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

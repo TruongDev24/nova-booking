@@ -1,5 +1,20 @@
-import React from 'react';
-import { User, Phone, ShoppingBag } from 'lucide-react';
+import React from "react";
+import { User, Phone, ShoppingBag } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface VipCustomer {
   userId: string;
@@ -15,68 +30,85 @@ interface VipCustomersTableProps {
 
 const VipCustomersTable: React.FC<VipCustomersTableProps> = ({ customers }) => {
   return (
-    <div className="bg-white rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden h-full flex flex-col">
-      <div className="p-8 border-b border-slate-50">
-        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
-          <User className="w-5 h-5 text-indigo-600" />
-          Top khách hàng VIP
-        </h3>
-        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Dựa trên tổng chi tiêu</p>
-      </div>
-
-      <div className="overflow-x-auto flex-1">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50">
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Khách hàng</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Số lượt</th>
-              <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Tổng chi tiêu</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
+    <Card className="border-none shadow-sm flex flex-col h-full overflow-hidden">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <User className="h-5 w-5 text-indigo-500" />
+          <div>
+            <CardTitle className="text-lg font-black uppercase tracking-tight">
+              Top khách hàng VIP
+            </CardTitle>
+            <CardDescription className="text-[10px] font-black uppercase tracking-widest">
+              Dựa trên tổng mức chi tiêu
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0 flex-1 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="px-6 text-[10px] font-black uppercase tracking-widest">
+                Khách hàng
+              </TableHead>
+              <TableHead className="text-center text-[10px] font-black uppercase tracking-widest">
+                Số lượt
+              </TableHead>
+              <TableHead className="text-right px-6 text-[10px] font-black uppercase tracking-widest">
+                Chi tiêu
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {customers && customers.length > 0 ? (
               customers.map((customer, index) => (
-                <tr key={customer.userId} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-8 py-5">
+                <TableRow key={customer.userId} className="group transition-colors">
+                  <TableCell className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs group-hover:scale-110 transition-transform">
+                      <div className="w-7 h-7 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-[10px] group-hover:scale-110 transition-transform">
                         {index + 1}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-black text-slate-900">{customer.name}</span>
-                        <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                        <span className="text-sm font-black tracking-tight text-foreground">
+                          {customer.name}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground font-bold flex items-center gap-1">
                           <Phone className="w-3 h-3" /> {customer.phone}
                         </span>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-8 py-5 text-center">
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase">
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[9px] font-black uppercase">
                       <ShoppingBag className="w-3 h-3" /> {customer.totalBookings}
                     </span>
-                  </td>
-                  <td className="px-8 py-5 text-right">
-                    <span className="text-sm font-black text-slate-900 flex items-center justify-end gap-1">
+                  </TableCell>
+                  <TableCell className="text-right px-6">
+                    <span className="text-sm font-black tracking-tight">
                       {customer.totalSpent.toLocaleString()}
-                      <span className="text-[10px] text-slate-400">đ</span>
+                      <span className="text-[10px] text-muted-foreground ml-0.5">
+                        đ
+                      </span>
                     </span>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             ) : (
-              <tr>
-                <td colSpan={3} className="px-8 py-20 text-center">
-                   <div className="flex flex-col items-center gap-2 opacity-20">
-                      <User className="w-10 h-10" />
-                      <p className="text-[10px] font-black uppercase tracking-widest">Chưa có dữ liệu VIP</p>
-                   </div>
-                </td>
-              </tr>
+              <TableRow>
+                <TableCell colSpan={3} className="h-40 text-center">
+                  <div className="flex flex-col items-center gap-2 opacity-30">
+                    <User className="h-8 w-8" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">
+                      Chưa có dữ liệu
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 };
 

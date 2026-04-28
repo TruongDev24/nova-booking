@@ -1,17 +1,42 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { 
-  Plus, Search, Map as MapIcon, Edit, Trash2, X, Loader2, 
-  Camera, Check, Wifi, Coffee, Car, ShoppingBag, 
-  ChevronLeft, ChevronRight, AlertCircle, HelpCircle
+  Plus, Map as MapIcon, Edit, Trash2, X, Loader2, 
+  Camera, Wifi, Coffee, Car, ShoppingBag, 
+  MoreHorizontal
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { courtService, Court, PaginatedCourts } from "@/services/court.service";
-import { toast, Toaster } from "react-hot-toast";
+import { courtService, Court } from "@/services/court.service";
+import { toast } from "sonner";
 import Image from "next/image";
+import { ColumnDef } from "@tanstack/react-table";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { DataTable } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // --- Configuration ---
 const AMENITIES_LIST = [
@@ -46,28 +71,14 @@ const courtSchema = z.object({
   amenities: z.array(z.string()).optional(),
 });
 
-interface CourtFormValues {
-  name: string;
-  location: string;
-  pricePerHour: number;
-  description?: string;
-  openingTime: string;
-  closingTime: string;
-  amenities?: string[];
-}
+type CourtFormValues = z.infer<typeof courtSchema>;
 
 export default function AdminCourtsPage() {
-  const [courtsData, setCourtsData] = useState<PaginatedCourts | null>(null);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourt, setEditingCourt] = useState<Court | null>(null);
+  const [courtToDelete, setCourtToDelete] = useState<string | null>(null);
   
-  // States for confirmation
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingData, setPendingData] = useState<CourtFormValues | null>(null);
-
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
 
@@ -77,7 +88,7 @@ export default function AdminCourtsPage() {
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<CourtFormValues>({
     resolver: zodResolver(courtSchema),
     defaultValues: {
@@ -94,30 +105,141 @@ export default function AdminCourtsPage() {
   // eslint-disable-next-line react-hooks/incompatible-library
   const watchAmenities = watch("amenities") || [];
 
-  const fetchCourts = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const result = await courtService.getAll(page, 6, search);
-      setCourtsData(result);
-    } catch (error) {
-      console.error(error);
-      toast.error("Không thể tải danh sách sân");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, search]);
+  // --- React Query: Fetch ---
+  const { data: courts = [], isLoading } = useQuery({
+    queryKey: ["courts"],
+    queryFn: async () => {
+      const result = await courtService.getAll(1, 100);
+      return result.data;
+    },
+  });
 
-  useEffect(() => {
-    fetchCourts();
-  }, [fetchCourts]);
+  // --- React Query: Mutations ---
+  const createMutation = useMutation({
+    mutationFn: (formData: FormData) => courtService.create(formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courts"] });
+      setIsModalOpen(false);
+      reset();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, formData }: { id: string; formData: FormData }) =>
+      courtService.update(id, formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courts"] });
+      setIsModalOpen(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => courtService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courts"] });
+      toast.success("Đã xóa sân thành công");
+    },
+    onError: () => {
+      toast.error("Không thể xóa sân. Vui lòng thử lại.");
+    }
+  });
+
+  const columns: ColumnDef<Court>[] = [
+    {
+      accessorKey: "name",
+      header: "Tên sân",
+      cell: ({ row }) => {
+        const court = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="relative h-10 w-10 rounded-lg overflow-hidden border bg-muted">
+              {court.images?.[0] ? (
+                <Image src={court.images[0]} alt={court.name} fill className="object-cover" />
+              ) : (
+                <Camera className="h-5 w-5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/50" />
+              )}
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-sm tracking-tight">{court.name}</span>
+              <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{court.openingTime} - {court.closingTime}</span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "location",
+      header: "Địa điểm",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium max-w-[200px]">
+          <MapIcon className="h-3 w-3 shrink-0" />
+          <span className="truncate">{row.original.location}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "pricePerHour",
+      header: "Giá thuê",
+      cell: ({ row }) => (
+        <div className="font-black text-primary">
+          {row.original.pricePerHour.toLocaleString()}đ
+        </div>
+      ),
+    },
+    {
+      accessorKey: "amenities",
+      header: "Tiện ích",
+      cell: ({ row }) => {
+        const amenities = row.original.amenities as string[] || [];
+        return (
+          <div className="flex gap-1">
+            {amenities.slice(0, 3).map((a) => {
+               const amenity = AMENITIES_LIST.find(item => item.id === a);
+               return (
+                 <div key={a} className="w-6 h-6 rounded-full bg-muted border flex items-center justify-center" title={amenity?.label || a}>
+                    {amenity?.icon ? React.createElement(amenity.icon, { className: "w-3 h-3 text-muted-foreground" }) : "•"}
+                 </div>
+               );
+            })}
+            {amenities.length > 3 && <span className="text-[10px] text-muted-foreground self-center">+{amenities.length - 3}</span>}
+          </div>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const court = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => openModal(court)}>
+                  <Edit className="mr-2 h-4 w-4" /> Sửa thông tin
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setCourtToDelete(court.id)} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" /> Xóa sân
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
-      
       for (const file of files) {
         if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-          toast.error(`File ${file.name} không đúng định dạng (Chỉ nhận JPG, PNG, WEBP)`);
+          toast.error(`File ${file.name} không đúng định dạng`);
           return;
         }
         if (file.size > MAX_FILE_SIZE) {
@@ -125,7 +247,6 @@ export default function AdminCourtsPage() {
           return;
         }
       }
-
       setSelectedFiles(files);
       const filePreviews = files.map(file => URL.createObjectURL(file));
       setPreviews(filePreviews);
@@ -136,8 +257,6 @@ export default function AdminCourtsPage() {
     setEditingCourt(court);
     setPreviews([]);
     setSelectedFiles([]);
-    setShowConfirm(false);
-    setPendingData(null);
     
     if (court) {
       setValue("name", court.name);
@@ -162,349 +281,208 @@ export default function AdminCourtsPage() {
     }
   };
 
-  const onSubmit = (data: CourtFormValues) => {
+  const onFormSubmit = async (data: CourtFormValues) => {
     if (!editingCourt && selectedFiles.length === 0) {
       toast.error("Vui lòng chọn ít nhất 1 ảnh cho sân mới");
       return;
     }
-    setPendingData(data);
-    setShowConfirm(true); 
-  };
 
-  const confirmSubmit = async () => {
-    if (!pendingData) return;
-    
-    try {
-      const formData = new FormData();
-      formData.append("name", pendingData.name.trim());
-      formData.append("location", pendingData.location.trim());
-      formData.append("pricePerHour", pendingData.pricePerHour.toString());
-      formData.append("openingTime", pendingData.openingTime);
-      formData.append("closingTime", pendingData.closingTime);
-      if (pendingData.description) formData.append("description", pendingData.description.trim());
-      if (pendingData.amenities) formData.append("amenities", JSON.stringify(pendingData.amenities));
+    const formData = new FormData();
+    formData.append("name", data.name.trim());
+    formData.append("location", data.location.trim());
+    formData.append("pricePerHour", data.pricePerHour.toString());
+    formData.append("openingTime", data.openingTime);
+    formData.append("closingTime", data.closingTime);
+    if (data.description) formData.append("description", data.description.trim());
+    if (data.amenities) formData.append("amenities", JSON.stringify(data.amenities));
+    selectedFiles.forEach((file) => formData.append("images", file));
 
-      selectedFiles.forEach((file) => {
-        formData.append("images", file);
+    if (editingCourt) {
+      toast.promise(updateMutation.mutateAsync({ id: editingCourt.id, formData }), {
+        loading: "Đang cập nhật thông tin sân...",
+        success: "Cập nhật sân thành công!",
+        error: "Lỗi khi cập nhật sân",
       });
-
-      if (editingCourt) {
-        await courtService.update(editingCourt.id, formData);
-        toast.success("Cập nhật sân thành công!");
-      } else {
-        await courtService.create(formData);
-        toast.success("Thêm sân mới thành công!");
-      }
-      
-      setIsModalOpen(false);
-      setShowConfirm(false);
-      setPendingData(null);
-      fetchCourts();
-    } catch (error) {
-      console.error("Submit Error:", error);
-      toast.error("Đã có lỗi xảy ra khi lưu dữ liệu");
+    } else {
+      toast.promise(createMutation.mutateAsync(formData), {
+        loading: "Đang tạo sân mới...",
+        success: "Thêm sân mới thành công!",
+        error: "Lỗi khi thêm sân mới",
+      });
     }
   };
-
-  const handleDelete = async (id: string) => {
-    const isConfirmed = window.confirm(
-      "HÀNH ĐỘNG NGUY HIỂM!\n\nBạn có chắc chắn muốn xóa sân này không? Dữ liệu sẽ không thể khôi phục."
-    );
-
-    if (isConfirmed) {
-      try {
-        await courtService.delete(id);
-        toast.success("Đã xóa sân thành công");
-        fetchCourts();
-      } catch {
-        toast.error("Không thể xóa sân. Vui lòng thử lại sau.");
-      }
-    }
-  };
-
-  const courts = courtsData?.data || [];
-  const meta = courtsData?.meta;
 
   return (
-    <div className="space-y-6">
-      <Toaster position="top-right" />
-      
+    <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quản lý Sân</h1>
-          <p className="text-slate-500 text-sm font-medium">Hệ thống quản lý cơ sở vật chất và tiện ích.</p>
+          <h1 className="text-3xl font-black tracking-tight uppercase">Quản lý Sân</h1>
+          <p className="text-muted-foreground font-medium">Hệ thống quản lý cơ sở vật chất và tiện ích.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Tìm tên sân..." 
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm w-64 font-medium"
-            />
-          </div>
-          <button 
-            onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-slate-200"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="hidden md:inline">Thêm sân mới</span>
-          </button>
-        </div>
+        <Button 
+          onClick={() => openModal()}
+          className="flex items-center gap-2 h-11 px-6 rounded-xl font-bold shadow-lg"
+        >
+          <Plus className="w-5 h-5" />
+          <span>Thêm sân mới</span>
+        </Button>
       </div>
 
-      <div className="min-h-[400px]">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-[400px]">
-            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-          </div>
-        ) : courts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[400px] text-slate-400 bg-white rounded-3xl border border-dashed border-slate-200 shadow-sm">
-            <MapIcon className="w-12 h-12 mb-4 opacity-10" />
-            <p className="font-bold uppercase tracking-widest text-xs">Không tìm thấy sân nào</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {courts.map((court) => (
-                <div key={court.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-xl transition-all duration-300">
-                  <div className="relative h-48 bg-slate-50">
-                    {court.images && court.images.length > 0 ? (
-                      <Image src={court.images[0]} alt={court.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-300">
-                        <Camera className="w-10 h-10" />
-                      </div>
-                    )}
-                    <div className="absolute top-3 right-3 flex gap-2">
-                      <button onClick={() => openModal(court)} className="p-2.5 bg-white/90 backdrop-blur-sm rounded-xl text-blue-500 hover:bg-blue-500 hover:text-white shadow-sm transition-all">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDelete(court.id)} className="p-2.5 bg-white/90 backdrop-blur-sm rounded-xl text-red-500 hover:bg-red-500 hover:text-white shadow-sm transition-all">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <h3 className="font-bold text-slate-900 text-lg mb-1">{court.name}</h3>
-                    <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium mb-4">
-                       <MapIcon className="w-3 h-3" />
-                       <span className="line-clamp-1">{court.location}</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Giá thuê / Giờ</span>
-                        <span className="font-black text-blue-600 text-xl">{court.pricePerHour.toLocaleString()}đ</span>
-                      </div>
-                      <div className="flex -space-x-2">
-                         {Array.isArray(court.amenities) && court.amenities.slice(0, 3).map((a) => {
-                            const amenity = AMENITIES_LIST.find(item => item.id === a);
-                            return (
-                              <div key={a} className="w-8 h-8 rounded-full bg-slate-50 border-2 border-white flex items-center justify-center text-[10px] shadow-sm" title={amenity?.label || a}>
-                                 {amenity?.icon ? React.createElement(amenity.icon, { className: "w-3.5 h-3.5 text-slate-600" }) : "•"}
-                              </div>
-                            );
-                         })}
-                      </div>
-                    </div>
-                  </div>
+      {isLoading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-[250px]" />
+          <div className="border rounded-xl">
+             {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4 p-4 border-b last:border-0">
+                   <Skeleton className="h-10 w-10 rounded-lg" />
+                   <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-[40%]" />
+                      <Skeleton className="h-3 w-[20%]" />
+                   </div>
+                   <Skeleton className="h-4 w-[100px]" />
                 </div>
-              ))}
-            </div>
+             ))}
+          </div>
+        </div>
+      ) : (
+        <DataTable 
+          columns={columns} 
+          data={courts} 
+          searchKey="name" 
+          searchPlaceholder="Tìm kiếm theo tên sân..." 
+        />
+      )}
 
-            {/* Pagination Controls */}
-            {meta && meta.lastPage > 1 && (
-              <div className="flex items-center justify-center gap-6 pt-4">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage(p => p - 1)}
-                  className="p-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-slate-900">TRANG {page}</span>
-                  <span className="text-sm font-bold text-slate-400">/ {meta.lastPage}</span>
-                </div>
-                <button
-                  disabled={page === meta.lastPage}
-                  onClick={() => setPage(p => p + 1)}
-                  className="p-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Confirmation Dialog for Delete */}
+      <AlertDialog open={!!courtToDelete} onOpenChange={() => setCourtToDelete(null)}>
+        <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase">Xác nhận xóa sân?</AlertDialogTitle>
+            <AlertDialogDescription className="font-medium">
+              Hành động này không thể hoàn tác. Dữ liệu sân và các thông tin liên quan sẽ bị xóa vĩnh viễn.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="rounded-xl h-11 font-bold">Hủy bỏ</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => courtToDelete && deleteMutation.mutate(courtToDelete)}
+              className="rounded-xl h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold"
+            >
+              Xác nhận xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md overflow-y-auto">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl my-auto overflow-hidden animate-in fade-in zoom-in duration-300">
-            {/* Confirmation Overlay (Strict) */}
-            {showConfirm && (
-              <div className="absolute inset-0 z-[60] bg-white/98 backdrop-blur-sm flex items-center justify-center p-8 animate-in fade-in duration-200">
-                <div className="text-center max-w-sm space-y-6">
-                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto ${editingCourt ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                     {editingCourt ? <HelpCircle className="w-10 h-10" /> : <Check className="w-10 h-10" />}
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-2xl font-black text-slate-900">
-                       {editingCourt ? "Xác nhận cập nhật?" : "Xác nhận tạo sân?"}
-                    </h4>
-                    <p className="text-slate-500 font-medium leading-relaxed">
-                      {editingCourt 
-                         ? "Bạn có chắc chắn muốn lưu các thay đổi cho sân này?" 
-                         : "Bạn có chắc chắn muốn tạo sân này với các thông tin đã nhập?"}
-                    </p>
-                  </div>
-                  <div className="flex gap-3 pt-4">
-                    <button 
-                      onClick={() => setShowConfirm(false)}
-                      className="flex-1 px-6 py-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-600 hover:bg-slate-50 transition-all"
-                    >
-                      Hủy
-                    </button>
-                    <button 
-                      onClick={confirmSubmit}
-                      disabled={isSubmitting}
-                      className="flex-1 px-6 py-4 rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-                    >
-                      {isSubmitting && <Loader2 className="w-5 h-5 animate-spin" />}
-                      Xác nhận
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between p-8 border-b border-slate-50">
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-card border rounded-[2rem] shadow-2xl w-full max-w-2xl my-auto overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-black uppercase tracking-tight">
                 {editingCourt ? "Cập nhật sân" : "Thêm sân mới"}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2.5 hover:bg-slate-50 rounded-full transition-colors">
-                <X className="w-6 h-6 text-slate-400" />
-              </button>
+              <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
+                <X className="w-6 h-6 text-muted-foreground" />
+              </Button>
             </div>
             
-            <form onSubmit={handleSubmit(onSubmit)} className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
-              {/* Image Upload Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Hình ảnh sân (Tối đa 5 ảnh)</label>
-                   <span className="text-[10px] font-bold text-slate-300">JPG, PNG, WEBP (Tối đa 5MB)</span>
-                </div>
-                <div className="grid grid-cols-5 gap-3">
-                  {previews.map((src, idx) => (
-                    <div key={idx} className="aspect-square rounded-2xl border border-slate-100 overflow-hidden relative group shadow-sm">
-                      <Image src={src} alt="preview" fill className="object-cover" />
-                    </div>
-                  ))}
-                  {previews.length < 5 && (
-                    <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-400 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 cursor-pointer transition-all bg-slate-50">
-                      <Camera className="w-6 h-6 mb-1" />
-                      <span className="text-[10px] font-black uppercase tracking-tighter">Thêm</span>
-                      <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" />
-                    </label>
-                  )}
-                </div>
+            <form onSubmit={handleSubmit(onFormSubmit)} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="space-y-3">
+                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Hình ảnh sân (Tối đa 5 ảnh)</label>
+                 <div className="grid grid-cols-5 gap-3">
+                   {previews.map((src, idx) => (
+                     <div key={idx} className="aspect-square rounded-xl border overflow-hidden relative shadow-sm">
+                       <Image src={src} alt="preview" fill className="object-cover" />
+                     </div>
+                   ))}
+                   {previews.length < 5 && (
+                     <label className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary hover:bg-muted cursor-pointer transition-all bg-muted/50">
+                       <Camera className="w-5 h-5 mb-1" />
+                       <span className="text-[9px] font-black uppercase">Thêm</span>
+                       <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" />
+                     </label>
+                   )}
+                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Tên sân</label>
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Tên sân</label>
                   <input 
                     {...register("name")} 
-                    placeholder="VD: Sân Cầu Lông NOVA 1" 
-                    className={`w-full px-5 py-3.5 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-slate-900 ${errors.name ? 'border-red-100 focus:border-red-500' : 'border-slate-50 focus:border-blue-500 focus:bg-white'}`} 
+                    className={`w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none transition-all font-bold text-sm ${errors.name ? 'border-destructive' : 'focus:border-primary focus:bg-background'}`} 
                   />
-                  {errors.name && <div className="flex items-center gap-1.5 text-red-500 mt-2 font-bold text-[11px]"><AlertCircle className="w-3.5 h-3.5" />{errors.name.message}</div>}
+                  {errors.name && <p className="text-destructive mt-1 text-[10px] font-bold uppercase">{errors.name.message}</p>}
                 </div>
                 
                 <div className="col-span-2">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Địa chỉ chi tiết</label>
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Địa chỉ chi tiết</label>
                   <input 
                     {...register("location")} 
-                    className={`w-full px-5 py-3.5 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-slate-900 ${errors.location ? 'border-red-100 focus:border-red-500' : 'border-slate-50 focus:border-blue-500 focus:bg-white'}`} 
+                    className={`w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none transition-all font-bold text-sm ${errors.location ? 'border-destructive' : 'focus:border-primary focus:bg-background'}`} 
                   />
-                  {errors.location && <div className="flex items-center gap-1.5 text-red-500 mt-2 font-bold text-[11px]"><AlertCircle className="w-3.5 h-3.5" />{errors.location.message}</div>}
+                  {errors.location && <p className="text-destructive mt-1 text-[10px] font-bold uppercase">{errors.location.message}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Giá thuê / Giờ (VNĐ)</label>
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Giá thuê / Giờ</label>
                   <input 
                     type="number" 
                     {...register("pricePerHour", { valueAsNumber: true })} 
-                    className={`w-full px-5 py-3.5 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-slate-900 ${errors.pricePerHour ? 'border-red-100 focus:border-red-500' : 'border-slate-50 focus:border-blue-500 focus:bg-white'}`} 
+                    className={`w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none transition-all font-bold text-sm ${errors.pricePerHour ? 'border-destructive' : 'focus:border-primary focus:bg-background'}`} 
                   />
-                  {errors.pricePerHour && <div className="flex items-center gap-1.5 text-red-500 mt-2 font-bold text-[11px]"><AlertCircle className="w-3.5 h-3.5" />{errors.pricePerHour.message}</div>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Mô tả ngắn</label>
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Mô tả ngắn</label>
                   <input 
                     {...register("description")} 
-                    className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:border-blue-500 focus:bg-white outline-none font-bold text-slate-900 transition-all" 
+                    className="w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none focus:border-primary focus:bg-background font-bold text-sm transition-all" 
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Giờ mở cửa</label>
-                  <input 
-                    type="time"
-                    {...register("openingTime")} 
-                    className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:border-blue-500 focus:bg-white outline-none font-bold text-slate-900 transition-all" 
-                  />
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Giờ mở cửa</label>
+                  <input type="time" {...register("openingTime")} className="w-full h-11 px-4 bg-muted/50 border rounded-xl focus:border-primary focus:bg-background outline-none font-bold text-sm" />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Giờ đóng cửa</label>
-                  <input 
-                    type="time"
-                    {...register("closingTime")} 
-                    className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:border-blue-500 focus:bg-white outline-none font-bold text-slate-900 transition-all" 
-                  />
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Giờ đóng cửa</label>
+                  <input type="time" {...register("closingTime")} className="w-full h-11 px-4 bg-muted/50 border rounded-xl focus:border-primary focus:bg-background outline-none font-bold text-sm" />
                 </div>
               </div>
 
-              <div className="space-y-4">
-                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Tiện ích đi kèm</label>
-                 <div className="flex flex-wrap gap-3">
+              <div className="space-y-3">
+                 <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tiện ích đi kèm</label>
+                 <div className="flex flex-wrap gap-2">
                     {AMENITIES_LIST.map((item) => (
                        <button
                           key={item.id}
                           type="button"
                           onClick={() => toggleAmenity(item.id)}
-                          className={`flex items-center gap-2 px-5 py-3 rounded-2xl border-2 text-sm font-bold transition-all ${
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[11px] font-black uppercase transition-all ${
                              watchAmenities.includes(item.id)
-                             ? "bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/20"
-                             : "bg-white border-slate-100 text-slate-600 hover:border-slate-200"
+                             ? "bg-primary border-primary text-primary-foreground shadow-md"
+                             : "bg-background text-muted-foreground hover:border-primary"
                           }`}
                        >
-                          <item.icon className="w-4 h-4" />
+                          <item.icon className="w-3.5 h-3.5" />
                           {item.label}
                        </button>
                     ))}
                  </div>
               </div>
 
-              <div className="flex gap-4 pt-8 sticky bottom-0 bg-white pb-2">
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)} 
-                  className="flex-1 px-6 py-4 border-2 border-slate-100 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all"
-                >
-                  Hủy bỏ
-                </button>
-                <button 
+              <div className="flex gap-4 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="flex-1 h-12 rounded-xl">Hủy bỏ</Button>
+                <Button 
                   type="submit" 
-                  className="flex-[2] px-12 py-4 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="flex-[2] h-12 rounded-xl text-lg font-black uppercase tracking-widest"
                 >
-                  {editingCourt ? "Cập nhật sân" : "Tạo sân ngay"}
-                </button>
+                  {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                  Lưu dữ liệu
+                </Button>
               </div>
             </form>
           </div>
