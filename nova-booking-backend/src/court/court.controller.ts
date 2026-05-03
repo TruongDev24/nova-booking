@@ -10,8 +10,6 @@ import {
   UseInterceptors,
   UploadedFiles,
   Query,
-  DefaultValuePipe,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { CourtService } from './court.service';
 import { CreateCourtDto } from './dto/create-court.dto';
@@ -24,6 +22,7 @@ import { GetUser } from '../common/decorators/get-user.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import type { UserPayload } from '../common/interfaces/user-payload.interface';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Controller('courts')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -71,14 +70,8 @@ export class CourtController {
 
   @Get()
   @Roles(Role.ADMIN, Role.USER)
-  findAll(
-    @GetUser() user: UserPayload,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-    @Query('search') search?: string,
-  ) {
-    // Nếu là ADMIN, có thể lọc theo ownerId (tùy chọn), nếu là USER thì xem tất cả
-    return this.courtService.findAll(user, page, limit, search);
+  findAll(@GetUser() user: UserPayload, @Query() query: PaginationQueryDto) {
+    return this.courtService.findAll(user, query);
   }
 
   @Get(':id')

@@ -4,8 +4,10 @@ import { CourtController } from './court.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
+import { MailerModule } from '@nestjs-modules/mailer';
+
 @Module({
-  imports: [PrismaModule, CloudinaryModule],
+  imports: [PrismaModule, CloudinaryModule, MailerModule],
   controllers: [CourtController],
   providers: [CourtService],
 })

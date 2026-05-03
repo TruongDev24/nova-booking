@@ -2,10 +2,18 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { MailerService } from '@nestjs-modules/mailer';
+import { ConfigService } from '@nestjs/config';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Role } from '@prisma/client';
@@ -16,6 +24,8 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private mailerService: MailerService,
+    private configService: ConfigService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -37,8 +47,7 @@ export class AuthService {
       password: hashedPassword,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _p, ...result } = user;
+    const { password: _, ...result } = user;
     return result;
   }
 
@@ -74,5 +83,92 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const isMatch = await bcrypt.compare(dto.oldPassword, user.password);
+    if (!isMatch) throw new UnauthorizedException('Incorrect old password');
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(dto.newPassword, salt);
+
+    await this.usersService.update(userId, { password: hashedPassword });
+    return { message: 'Password changed successfully' };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) {
+      return {
+        message: 'If your email is registered, you will receive a reset link.',
+      };
+    }
+
+    const resetToken = crypto.randomUUID();
+    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.usersService.update(user.id, {
+      resetToken,
+      resetTokenExpiry,
+    });
+
+    const resetLink = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
+
+    try {
+      await this.mailerService.sendMail({
+        to: user.email,
+        subject: 'Đặt lại mật khẩu - Nova Booking',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+            <h2 style="color: #0891b2; text-align: center;">Nova Booking</h2>
+            <p>Chào <strong>${user.fullName}</strong>,</p>
+            <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản tại <strong>Nova Booking</strong>.</p>
+            <p>Vui lòng click vào nút bên dưới để tiến hành thiết lập lại mật khẩu. Liên kết này sẽ hết hạn sau 15 phút.</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetLink}" style="background-color: #0891b2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Đặt lại mật khẩu</a>
+            </div>
+            <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #718096; text-align: center;">Đây là email tự động, vui lòng không phản hồi.</p>
+          </div>
+        `,
+      });
+    } catch (error) {
+      console.error('Failed to send reset password email:', error);
+    }
+
+    return {
+      message: 'If your email is registered, you will receive a reset link.',
+    };
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, resetToken, resetTokenExpiry, ...result } = user;
+    return result;
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.usersService.findByResetToken(dto.token);
+    if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(dto.newPassword, salt);
+
+    await this.usersService.update(user.id, {
+      password: hashedPassword,
+      resetToken: null,
+      resetTokenExpiry: null,
+    });
+
+    return { message: 'Password reset successfully' };
   }
 }

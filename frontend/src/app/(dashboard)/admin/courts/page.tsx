@@ -109,7 +109,7 @@ export default function AdminCourtsPage() {
   const { data: courts = [], isLoading } = useQuery({
     queryKey: ["courts"],
     queryFn: async () => {
-      const result = await courtService.getAll(1, 100);
+      const result = await courtService.getAll({ page: 1, limit: 10 });
       return result.data;
     },
   });
@@ -225,7 +225,7 @@ export default function AdminCourtsPage() {
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setCourtToDelete(court.id)} className="text-destructive focus:text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" /> Xóa sân
+                <Trash2 className="mr-2 h-4 w-4" /> Ngừng hoạt động
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -357,9 +357,9 @@ export default function AdminCourtsPage() {
       <AlertDialog open={!!courtToDelete} onOpenChange={() => setCourtToDelete(null)}>
         <AlertDialogContent className="rounded-[2rem]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase">Xác nhận xóa sân?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl font-black uppercase">Ngừng hoạt động sân?</AlertDialogTitle>
             <AlertDialogDescription className="font-medium">
-              Hành động này không thể hoàn tác. Dữ liệu sân và các thông tin liên quan sẽ bị xóa vĩnh viễn.
+              Bạn có chắc chắn muốn ngừng hoạt động sân này? Hành động này sẽ <strong>tự động hủy tất cả các lịch đặt sân trong tương lai</strong> và gửi mail thông báo lỗi cho khách hàng.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3">
@@ -368,7 +368,7 @@ export default function AdminCourtsPage() {
               onClick={() => courtToDelete && deleteMutation.mutate(courtToDelete)}
               className="rounded-xl h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold"
             >
-              Xác nhận xóa
+              Xác nhận
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

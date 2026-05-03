@@ -8,12 +8,17 @@ import {
   CheckCircle2, 
   XCircle,
   Loader2,
-  Trash2
+  Trash2,
+  Star,
+  CreditCard
 } from "lucide-react";
 import { bookingService } from "@/services/booking.service";
+import { paymentService } from "@/services/payment.service";
 import { toast, Toaster } from "react-hot-toast";
 import { formatToVietnamDate } from "@/utils/date-format";
 import Image from "next/image";
+import { ReviewDialog } from "@/components/reviews/ReviewDialog";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Booking {
   id: string;
@@ -23,7 +28,7 @@ interface Booking {
   endTime: string;
   totalPrice: number;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
-  paymentStatus: string;
+  paymentStatus: "UNPAID" | "PARTIAL_PAID" | "PAID" | "REFUNDED";
   court: {
     name: string;
     location: string;
@@ -35,6 +40,9 @@ interface Booking {
 export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const fetchBookings = React.useCallback(async () => {
     try {
@@ -50,9 +58,25 @@ export default function MyBookingsPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchBookings();
   }, [fetchBookings]);
+
+  const handlePayment = async (bookingId: string) => {
+    try {
+      setIsProcessingPayment(bookingId);
+      toast.loading("Đang khởi tạo thanh toán...", { id: "payment" });
+      
+      const { checkoutUrl } = await paymentService.createLink(bookingId);
+      
+      toast.success("Đang chuyển hướng đến cổng thanh toán", { id: "payment" });
+      window.location.href = checkoutUrl;
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể tạo liên kết thanh toán", { id: "payment" });
+    } finally {
+      setIsProcessingPayment(null);
+    }
+  };
 
   const handleCancel = async (id: string) => {
     if (!window.confirm("Bạn có chắc chắn muốn hủy lịch đặt này không?")) return;
@@ -71,7 +95,7 @@ export default function MyBookingsPage() {
     switch (status) {
       case "CONFIRMED": return "bg-emerald-50 text-emerald-600 border-emerald-100";
       case "CANCELLED": return "bg-rose-50 text-rose-600 border-rose-100";
-      case "COMPLETED": return "bg-slate-50 text-slate-600 border-slate-100";
+      case "COMPLETED": return "bg-blue-50 text-blue-600 border-blue-100";
       default: return "bg-amber-50 text-amber-600 border-amber-100";
     }
   };
@@ -83,6 +107,27 @@ export default function MyBookingsPage() {
       case "COMPLETED": return <CheckCircle2 className="w-4 h-4" />;
       default: return <Clock className="w-4 h-4" />;
     }
+  };
+
+  const [now] = React.useState(() => Date.now());
+
+  const canCancel = (bookingDate: string, startTime: string) => {
+    const [year, month, day] = bookingDate.split('-').map(Number);
+    const [hour, minute] = startTime.split(':').map(Number);
+    const VN_UTC_OFFSET_HOURS = 7;
+    
+    const playTimeMs = Date.UTC(
+      year,
+      month - 1,
+      day,
+      hour - VN_UTC_OFFSET_HOURS,
+      minute,
+      0,
+      0,
+    );
+
+    const hoursDiff = (playTimeMs - now) / (1000 * 60 * 60);
+    return hoursDiff >= 12;
   };
 
   if (isLoading) {
@@ -164,17 +209,52 @@ export default function MyBookingsPage() {
                     </div>
                     <div className="font-bold text-slate-700">{booking.startTime} - {booking.endTime}</div>
                   </div>
-                  <div className="col-span-2 sm:col-span-1 flex items-center justify-end">
-                    {booking.status === "PENDING" || booking.status === "CONFIRMED" ? (
+                  <div className="col-span-2 sm:col-span-1 flex flex-col sm:items-end justify-center gap-3">
+                    {(booking.status === "PENDING" || booking.status === "CONFIRMED") && booking.paymentStatus === "UNPAID" && (
+                      <button 
+                        onClick={() => handlePayment(booking.id)}
+                        disabled={isProcessingPayment === booking.id}
+                        className="flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 disabled:opacity-50 w-full sm:w-auto"
+                      >
+                        {isProcessingPayment === booking.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CreditCard className="w-4 h-4" />
+                        )}
+                        Thanh toán
+                      </button>
+                    )}
+
+                    {(booking.status === "PENDING" || booking.status === "CONFIRMED") && canCancel(booking.bookingDate, booking.startTime) ? (
                       <button 
                         onClick={() => handleCancel(booking.id)}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-bold hover:bg-rose-600 hover:text-white transition-all border border-rose-100"
+                        className="flex items-center justify-center gap-2 px-6 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-bold hover:bg-rose-600 hover:text-white transition-all border border-rose-100 w-full sm:w-auto"
                       >
                         <Trash2 className="w-4 h-4" />
                         Hủy lịch
                       </button>
+                    ) : booking.status === "COMPLETED" ? (
+                      booking.review ? (
+                        <div className="flex items-center gap-2 px-6 py-2.5 bg-slate-50 text-slate-400 rounded-xl font-bold border border-slate-100 cursor-default">
+                          <Star className="w-4 h-4 fill-slate-300 text-slate-300" />
+                          Đã đánh giá
+                        </div>
+                      ) : (
+                        <ReviewDialog 
+                          bookingId={booking.id} 
+                          courtName={booking.court.name} 
+                          onSuccess={fetchBookings}
+                        >
+                          <button className="flex items-center gap-2 px-6 py-2.5 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-600 hover:text-white transition-all border border-blue-100">
+                            <Star className="w-4 h-4" />
+                            Đánh giá
+                          </button>
+                        </ReviewDialog>
+                      )
                     ) : (
-                      <div className="text-slate-300 italic text-sm">Không thể thao tác</div>
+                      <div className="text-slate-300 italic text-sm">
+                        {booking.status === "PENDING" || booking.status === "CONFIRMED" ? "Đã quá hạn hủy" : "Không thể thao tác"}
+                      </div>
                     )}
                   </div>
                 </div>

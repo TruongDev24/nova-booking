@@ -135,20 +135,26 @@ describe('CourtController', () => {
       };
       jest.spyOn(service, 'findAll').mockResolvedValue(mockResult);
 
-      const result = await controller.findAll(mockUser, 1, 10, 'Test');
+      const result = await controller.findAll(mockUser, {
+        page: 1,
+        limit: 10,
+        search: 'Test',
+      });
 
-      expect(service.findAll).toHaveBeenCalledWith(mockUser, 1, 10, 'Test');
+      expect(service.findAll).toHaveBeenCalledWith(mockUser, {
+        page: 1,
+        limit: 10,
+        search: 'Test',
+      });
       expect(result).toEqual(mockResult);
     });
 
     it('should handle large limits safely via service propagation', async () => {
-      await controller.findAll(mockUser, 1, 9999);
-      expect(service.findAll).toHaveBeenCalledWith(
-        mockUser,
-        1,
-        9999,
-        undefined,
-      );
+      await controller.findAll(mockUser, { page: 1, limit: 9999 });
+      expect(service.findAll).toHaveBeenCalledWith(mockUser, {
+        page: 1,
+        limit: 9999,
+      });
     });
   });
 

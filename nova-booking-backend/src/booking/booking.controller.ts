@@ -8,8 +8,6 @@ import {
   UseGuards,
   BadRequestException,
   Patch,
-  DefaultValuePipe,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -20,6 +18,7 @@ import { Role, BookingStatus } from '@prisma/client';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import type { UserPayload } from '../common/interfaces/user-payload.interface';
 import { Public } from '../auth/decorators/public.decorator';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Controller('bookings')
 export class BookingController {
@@ -63,18 +62,14 @@ export class BookingController {
   @Roles(Role.ADMIN)
   findAllAdmin(
     @GetUser() user: UserPayload,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-    @Query('search') search?: string,
+    @Query() query: PaginationQueryDto,
     @Query('status') status?: BookingStatus,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     return this.bookingService.findAllAdmin(
       user.sub,
-      page,
-      limit,
-      search,
+      query,
       status,
       startDate,
       endDate,

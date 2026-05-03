@@ -55,7 +55,14 @@ export default function AdminBookingsPage() {
   // --- React Query: Fetch ---
   const { data: bookingsData, isLoading } = useQuery({
     queryKey: ["admin-bookings", search, status, startDate, endDate],
-    queryFn: () => bookingService.getAllAdmin(1, 100, search, status, startDate, endDate),
+    queryFn: () => bookingService.getAllAdmin({
+      page: 1, 
+      limit: 10, 
+      search, 
+      status, 
+      startDate, 
+      endDate
+    }),
   });
 
   const bookings = bookingsData?.data || [];
@@ -66,18 +73,26 @@ export default function AdminBookingsPage() {
     mutationFn: (id: string) => bookingService.confirmBookingAdmin(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
+      setBookingToConfirm(null);
       toast.success("Đã xác nhận đơn hàng!");
     },
-    onError: () => toast.error("Lỗi khi xác nhận đơn hàng"),
+    onError: () => {
+      setBookingToConfirm(null);
+      toast.error("Lỗi khi xác nhận đơn hàng");
+    },
   });
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => bookingService.cancelBookingAdmin(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
+      setBookingToCancel(null);
       toast.success("Đã hủy đơn thành công");
     },
-    onError: () => toast.error("Lỗi khi hủy đơn hàng"),
+    onError: () => {
+      setBookingToCancel(null);
+      toast.error("Lỗi khi hủy đơn hàng");
+    },
   });
 
   const columns: ColumnDef<Booking>[] = [

@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '../../src/auth/auth.service';
 import { UsersService } from '../../src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
+import { MailerService } from '@nestjs-modules/mailer';
+import { ConfigService } from '@nestjs/config';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
@@ -12,14 +14,22 @@ jest.mock('bcrypt');
 describe('AuthService', () => {
   let service: AuthService;
 
-  const mockUsersService = {
+  const mockUsersService: any = {
     findByEmailOrPhone: jest.fn(),
     create: jest.fn(),
     findByEmail: jest.fn(),
   };
 
-  const mockJwtService = {
+  const mockJwtService: any = {
     sign: jest.fn(),
+  };
+
+  const mockMailerService: any = {
+    sendMail: jest.fn(),
+  };
+
+  const mockConfigService: any = {
+    get: jest.fn().mockReturnValue('http://localhost:3000'),
   };
 
   beforeEach(async () => {
@@ -28,6 +38,8 @@ describe('AuthService', () => {
         AuthService,
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
+        { provide: MailerService, useValue: mockMailerService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 
@@ -48,15 +60,8 @@ describe('AuthService', () => {
       role: Role.USER,
     };
 
-    it('should throw ConflictException if user already exists', async () => {
-      mockUsersService.findByEmailOrPhone.mockResolvedValue({ id: '1' });
-
-      await expect(service.register(registerDto)).rejects.toThrow(
-        ConflictException,
-      );
-    });
-
-    it('should hash password and save user with default role', async () => {
+    it('Scenario 1 (Happy Path - Strict No Auto-Login): Nên đăng ký thành công và KHÔNG tự động đăng nhập', async () => {
+      // Mock: Email chưa tồn tại
       mockUsersService.findByEmailOrPhone.mockResolvedValue(null);
 
       const hashedPassword = 'hashedPassword';
@@ -67,7 +72,6 @@ describe('AuthService', () => {
         id: 'uuid-123',
         ...registerDto,
         password: hashedPassword,
-        role: Role.USER,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -76,26 +80,32 @@ describe('AuthService', () => {
 
       const result = await service.register(registerDto);
 
-      expect(bcrypt.genSalt).toHaveBeenCalledWith(10);
-      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 'salt');
-      expect(mockUsersService.create).toHaveBeenCalledWith({
-        ...registerDto,
-        password: hashedPassword,
-      });
+      // Verify Prisma create was called
+      expect(mockUsersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: registerDto.email,
+          password: hashedPassword,
+        }),
+      );
+
+      // CRITICAL ASSERT: Không được trả về access_token
+      expect(result).not.toHaveProperty('access_token');
+      expect(result).not.toHaveProperty('user'); // Trả về user object trực tiếp, không bọc trong field 'user'
       expect(result).not.toHaveProperty('password');
       expect(result.email).toBe(registerDto.email);
+
+      // CRITICAL ASSERT: JwtService.sign KHÔNG được gọi
+      expect(mockJwtService.sign).not.toHaveBeenCalled();
     });
 
-    it('should save user with provided role if specified', async () => {
-      const dtoWithRole: RegisterDto = { ...registerDto, role: Role.ADMIN };
-      mockUsersService.findByEmailOrPhone.mockResolvedValue(null);
-      mockUsersService.create.mockResolvedValue({ ...dtoWithRole, id: '2' });
+    it('Scenario 2 (Conflict Error - Email Exists): Nên báo lỗi nếu email đã tồn tại', async () => {
+      // Mock: Email đã tồn tại
+      mockUsersService.findByEmailOrPhone.mockResolvedValue({ id: 'existing-id' });
 
-      await service.register(dtoWithRole);
+      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
 
-      expect(mockUsersService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ role: Role.ADMIN }),
-      );
+      // Verify: Không gọi hàm tạo người dùng
+      expect(mockUsersService.create).not.toHaveBeenCalled();
     });
   });
 

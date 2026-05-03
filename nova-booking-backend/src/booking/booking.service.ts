@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingStatus, Prisma } from '@prisma/client';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Injectable()
 export class BookingService {
@@ -109,13 +110,7 @@ export class BookingService {
   }
 
   async createMultiBooking(dto: CreateBookingDto, userId: string) {
-    const {
-      courtId,
-      bookingDate,
-      slots,
-      totalPrice,
-      startTime: dtStartTime,
-    } = dto;
+    const { courtId, bookingDate, slots, startTime: dtStartTime } = dto;
 
     const court = await this.prisma.court.findUnique({
       where: { id: courtId },
@@ -201,29 +196,44 @@ export class BookingService {
       );
     }
 
-    const pricePerSlot = totalPrice / finalBookings.length;
+    const pricePerSlot = court.pricePerHour;
 
-    return this.prisma.$transaction(
-      finalBookings.map((slot) => {
-        return this.prisma.booking.create({
-          data: {
-            courtId,
-            userId,
-            bookingDate,
-            startTime: slot.startTime,
-            endTime: slot.endTime,
-            totalPrice: pricePerSlot,
-            status: BookingStatus.PENDING,
-          },
-        });
-      }),
-    );
+    try {
+      return await this.prisma.$transaction(
+        finalBookings.map((slot) => {
+          return this.prisma.booking.create({
+            data: {
+              courtId,
+              userId,
+              bookingDate,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              totalPrice: pricePerSlot,
+              status: BookingStatus.PENDING,
+            },
+          });
+        }),
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'One or more slots were just booked by someone else',
+        );
+      }
+      throw error;
+    }
   }
 
   async findMyBookings(userId: string) {
     return this.prisma.booking.findMany({
       where: { userId },
-      include: { court: true },
+      include: {
+        court: true,
+        review: true,
+      },
       orderBy: {
         bookingDate: 'desc',
       },
@@ -247,6 +257,28 @@ export class BookingService {
       throw new BadRequestException('Lịch này đã được hủy trước đó');
     }
 
+    // 12-hour cancellation policy
+    const [year, month, day] = booking.bookingDate.split('-').map(Number);
+    const [hour, minute] = booking.startTime.split(':').map(Number);
+    const VN_UTC_OFFSET_HOURS = 7;
+
+    const playTimeMs = Date.UTC(
+      year,
+      month - 1,
+      day,
+      hour - VN_UTC_OFFSET_HOURS,
+      minute,
+      0,
+      0,
+    );
+
+    const hoursDiff = (playTimeMs - Date.now()) / (1000 * 60 * 60);
+    if (hoursDiff < 12) {
+      throw new BadRequestException(
+        'Cannot cancel within 12 hours of playtime',
+      );
+    }
+
     return this.prisma.booking.update({
       where: { id },
       data: { status: BookingStatus.CANCELLED },
@@ -257,13 +289,12 @@ export class BookingService {
 
   async findAllAdmin(
     userId: string,
-    page = 1,
-    limit = 10,
-    search = '',
+    query: PaginationQueryDto,
     status?: BookingStatus,
     startDate?: string,
     endDate?: string,
   ) {
+    const { page = 1, limit = 10, search, sortBy, sortOrder } = query;
     const skip = (page - 1) * limit;
 
     // STRICT ISOLATION: Only bookings for courts owned by this user
@@ -283,7 +314,7 @@ export class BookingService {
       where.bookingDate = dateFilter;
     }
 
-    if (search.trim()) {
+    if (search && search.trim()) {
       where.OR = [
         {
           user: {
@@ -303,6 +334,19 @@ export class BookingService {
       ];
     }
 
+    const orderBy: Prisma.BookingOrderByWithRelationInput = {};
+    if (sortBy) {
+      if (sortBy === 'userName') {
+        orderBy.user = { fullName: sortOrder || 'asc' };
+      } else if (sortBy === 'courtName') {
+        orderBy.court = { name: sortOrder || 'asc' };
+      } else {
+        orderBy[sortBy] = sortOrder || 'asc';
+      }
+    } else {
+      orderBy.createdAt = 'desc';
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.booking.findMany({
         where,
@@ -316,7 +360,7 @@ export class BookingService {
         },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       this.prisma.booking.count({ where }),
     ]);
@@ -327,7 +371,7 @@ export class BookingService {
         total,
         page,
         limit,
-        lastPage: Math.ceil(total / limit),
+        lastPage: Math.ceil(total / limit) || 1,
       },
     };
   }

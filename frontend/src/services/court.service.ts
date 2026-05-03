@@ -1,16 +1,4 @@
-import axios from 'axios';
-import Cookies from 'js-cookie';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-const getAuthHeader = () => {
-  const token = Cookies.get('access_token');
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
-};
+import apiClient from './apiClient';
 
 export interface Court {
   id: string;
@@ -23,6 +11,8 @@ export interface Court {
   images: string[];
   amenities: string[];
   ownerId: string;
+  avgRating: number;
+  totalReviews: number;
 }
 
 export interface PaginatedCourts {
@@ -36,31 +26,34 @@ export interface PaginatedCourts {
 }
 
 export const courtService = {
-  getAll: async (page = 1, limit = 10, search = '') => {
-    const response = await axios.get<PaginatedCourts>(`${API_URL}/courts`, {
-      ...getAuthHeader(),
-      params: { page, limit, search },
-    });
+  getAll: async (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  } = {}) => {
+    const response = await apiClient.get<PaginatedCourts>('/courts', { params });
     return response.data;
   },
 
   getOne: async (id: string) => {
-    const response = await axios.get<Court>(`${API_URL}/courts/${id}`, getAuthHeader());
+    const response = await apiClient.get<Court>(`/courts/${id}`);
     return response.data;
   },
 
   create: async (data: FormData) => {
-    const response = await axios.post<Court>(`${API_URL}/courts`, data, getAuthHeader());
+    const response = await apiClient.post<Court>('/courts', data);
     return response.data;
   },
 
   update: async (id: string, data: FormData) => {
-    const response = await axios.patch<Court>(`${API_URL}/courts/${id}`, data, getAuthHeader());
+    const response = await apiClient.patch<Court>(`/courts/${id}`, data);
     return response.data;
   },
 
   delete: async (id: string) => {
-    const response = await axios.delete(`${API_URL}/courts/${id}`, getAuthHeader());
+    const response = await apiClient.delete(`/courts/${id}`);
     return response.data;
   },
 };

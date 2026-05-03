@@ -31,4 +31,39 @@ export class CloudinaryService {
     const results = await Promise.all(uploadPromises);
     return results.map((result) => (result as UploadApiResponse).secure_url);
   }
+
+  extractPublicId(url: string): string | null {
+    try {
+      const parts = url.split('/upload/');
+      if (parts.length < 2) return null;
+      const pathWithExtension = parts[1].split('/').slice(1).join('/');
+      const publicId = pathWithExtension.substring(
+        0,
+        pathWithExtension.lastIndexOf('.'),
+      );
+      return publicId || pathWithExtension; // fallback if no extension
+    } catch {
+      return null;
+    }
+  }
+
+  async deleteFile(publicId: string): Promise<any> {
+    try {
+      return await cloudinary.uploader.destroy(publicId);
+    } catch (error) {
+      console.error('Cloudinary Delete Error:', error);
+      return null;
+    }
+  }
+
+  async deleteFiles(urls: string[]): Promise<any[]> {
+    const promises = urls.map((url) => {
+      const publicId = this.extractPublicId(url);
+      if (publicId) {
+        return this.deleteFile(publicId);
+      }
+      return Promise.resolve(null);
+    });
+    return Promise.all(promises);
+  }
 }

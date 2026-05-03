@@ -1,7 +1,4 @@
-import axios from "axios";
-import Cookies from "js-cookie";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import apiClient from "./apiClient";
 
 export interface TimeSlot {
   startTime: string;
@@ -27,7 +24,7 @@ export interface Booking {
   startTime: string;
   endTime: string;
   totalPrice: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
   createdAt: string;
   user?: {
     fullName: string;
@@ -37,6 +34,11 @@ export interface Booking {
   court?: {
     name: string;
     location: string;
+  };
+  review?: {
+    id: string;
+    rating: number;
+    comment: string;
   };
 }
 
@@ -50,55 +52,52 @@ export interface PaginatedBookings {
   };
 }
 
-const getAuthHeader = () => {
-  const token = Cookies.get("access_token");
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
-};
-
 export const bookingService = {
   getSlots: async (courtId: string, date: string): Promise<TimeSlot[]> => {
-    const response = await axios.get(`${API_URL}/bookings/courts/${courtId}/slots`, {
+    const response = await apiClient.get(`/bookings/courts/${courtId}/slots`, {
       params: { date },
     });
     return response.data?.data || response.data || [];
   },
 
   createBooking: async (data: CreateBookingData) => {
-    const response = await axios.post(`${API_URL}/bookings`, data, getAuthHeader());
+    const response = await apiClient.post(`/bookings`, data);
     return response.data;
   },
 
   getMyBookings: async () => {
-    const response = await axios.get(`${API_URL}/bookings/my-bookings`, getAuthHeader());
+    const response = await apiClient.get(`/bookings/my-bookings`);
     return response.data;
   },
 
   cancelBooking: async (id: string) => {
-    const response = await axios.patch(`${API_URL}/bookings/${id}/cancel`, {}, getAuthHeader());
+    const response = await apiClient.patch(`/bookings/${id}/cancel`, {});
     return response.data;
   },
 
   // --- Admin Methods ---
 
-  getAllAdmin: async (page = 1, limit = 10, search = '', status?: string, startDate?: string, endDate?: string): Promise<PaginatedBookings> => {
-    const response = await axios.get(`${API_URL}/bookings/admin`, {
-      ...getAuthHeader(),
-      params: { page, limit, search, status, startDate, endDate },
-    });
+  getAllAdmin: async (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  } = {}): Promise<PaginatedBookings> => {
+    const response = await apiClient.get(`/bookings/admin`, { params });
     return response.data;
   },
 
   confirmBookingAdmin: async (id: string) => {
-    const response = await axios.patch(`${API_URL}/bookings/admin/${id}/confirm`, {}, getAuthHeader());
+    const response = await apiClient.patch(`/bookings/admin/${id}/confirm`, {});
     return response.data;
   },
 
   cancelBookingAdmin: async (id: string) => {
-    const response = await axios.patch(`${API_URL}/bookings/admin/${id}/cancel`, {}, getAuthHeader());
+    const response = await apiClient.patch(`/bookings/admin/${id}/cancel`, {});
     return response.data;
   },
 };

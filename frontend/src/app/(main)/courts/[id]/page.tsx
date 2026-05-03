@@ -151,8 +151,15 @@ export default function CourtDetailPage({ params }: PageProps) {
                   Phổ biến
                 </span>
                 <div className="flex items-center text-amber-400 gap-0.5">
-                  {[1, 2, 3, 4, 5].map(s => <Star key={s} className="w-4 h-4 fill-current" />)}
-                  <span className="ml-2 text-slate-400 text-sm font-medium">(4.8/5)</span>
+                  <Star className="w-4 h-4 fill-current" />
+                  <span className="ml-2 text-slate-900 text-sm font-black">
+                    {court.avgRating ? court.avgRating.toFixed(1) : "Chưa có đánh giá"}
+                  </span>
+                  {court.totalReviews > 0 && (
+                    <span className="ml-1 text-slate-400 text-sm font-medium">
+                      ({court.totalReviews} đánh giá)
+                    </span>
+                  )}
                 </div>
               </div>
               <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-none">

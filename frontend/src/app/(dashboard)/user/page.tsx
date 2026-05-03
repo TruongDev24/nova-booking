@@ -16,7 +16,7 @@ export default function ExploreCourtsPage() {
     try {
       setIsLoading(true);
       // Lấy 6 sân nổi bật nhất (limit=6)
-      const data = await courtService.getAll(1, 6, search);
+      const data = await courtService.getAll({ page: 1, limit: 6, search });
       setCourtsData(data);
     } catch (error) {
       console.error("Fetch Courts Error:", error);
@@ -127,7 +127,14 @@ export default function ExploreCourtsPage() {
                   )}
                   <div className="absolute top-5 left-5 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
                     <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                    <span className="text-sm font-black text-slate-900">4.9</span>
+                    <span className="text-sm font-black text-slate-900">
+                      {court.avgRating ? court.avgRating.toFixed(1) : "Chưa có"}
+                    </span>
+                    {court.totalReviews > 0 && (
+                      <span className="text-[10px] text-slate-400 font-bold ml-1">
+                        ({court.totalReviews})
+                      </span>
+                    )}
                   </div>
                 </div>
 

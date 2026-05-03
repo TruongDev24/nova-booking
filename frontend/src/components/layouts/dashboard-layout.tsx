@@ -56,10 +56,17 @@ const adminMenuItems = [
   { name: "Đơn đặt sân", href: "/admin/bookings", icon: CalendarDays },
 ];
 
+interface UserProfile {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+}
+
 export function DashboardLayout({ 
   children, 
-  menuItems = adminMenuItems,
-  roleLabel = "Chủ sân",
+  menuItems: initialMenuItems = adminMenuItems,
+  roleLabel: initialRoleLabel = "Chủ sân",
   roleDetail = "Manager"
 }: { 
   children: React.ReactNode,
@@ -67,8 +74,27 @@ export function DashboardLayout({
   roleLabel?: string,
   roleDetail?: string
 }) {
+  const [userData, setUserData] = React.useState<UserProfile | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  React.useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const profile = await authService.getProfile();
+        setUserData(profile);
+      } catch (error) {
+        console.error("Failed to fetch profile in layout:", error);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const profileHref = pathname.startsWith("/admin") ? "/admin/profile" : "/user/profile";
+  const menuItems = initialMenuItems;
+
+  const roleLabel = userData?.fullName || initialRoleLabel;
+  const userEmail = userData?.email || "user@nova.com";
 
   const handleLogout = () => {
     Cookies.remove("access_token");
@@ -189,16 +215,18 @@ export function DashboardLayout({
                   <DropdownMenuGroup>
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">Account</p>
-                        <p className="text-xs leading-none text-muted-foreground">user@nova.com</p>
+                        <p className="text-sm font-medium leading-none">{roleLabel}</p>
+                        <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
                       </div>
                     </DropdownMenuLabel>
                   </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Hồ sơ</span>
+                  <DropdownMenuItem asChild>
+                    <Link href={profileHref} className="flex w-full items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Hồ sơ</span>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
                     <Settings className="mr-2 h-4 w-4" />
