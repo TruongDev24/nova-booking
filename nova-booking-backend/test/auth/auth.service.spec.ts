@@ -60,7 +60,6 @@ describe('AuthService', () => {
       password: 'Password123',
       fullName: 'Test User',
       phone: '0987654321',
-      role: Role.USER,
     };
 
     it('Scenario 1 (Happy Path - Strict No Auto-Login): Nên đăng ký thành công và KHÔNG tự động đăng nhập', async () => {

@@ -13,10 +13,10 @@ import { ConfigService } from '@nestjs/config';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: Partial<Record<keyof UsersService, jest.Mock>>;
-  let jwtService: Partial<Record<keyof JwtService, jest.Mock>>;
-  let mailerService: Partial<Record<keyof MailerService, jest.Mock>>;
-  let configService: Partial<Record<keyof ConfigService, jest.Mock>>;
+  let usersService: any;
+  let jwtService: any;
+  let mailerService: any;
+  let configService: any;
 
   beforeEach(async () => {
     usersService = {
@@ -24,16 +24,16 @@ describe('AuthService', () => {
       findByEmail: jest.fn(),
       update: jest.fn(),
       findByResetToken: jest.fn(),
-    };
+    } as any;
     jwtService = {
       sign: jest.fn(),
-    };
+    } as any;
     mailerService = {
       sendMail: jest.fn().mockResolvedValue({}),
-    };
+    } as any;
     configService = {
       get: jest.fn().mockReturnValue('http://localhost:3000'),
-    };
+    } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

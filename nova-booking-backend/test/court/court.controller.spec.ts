@@ -34,6 +34,8 @@ describe('CourtController', () => {
     images: [] as string[], // Explicitly typed
     ownerId: 'user-id',
     isDeleted: false,
+    avgRating: 0,
+    totalReviews: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
