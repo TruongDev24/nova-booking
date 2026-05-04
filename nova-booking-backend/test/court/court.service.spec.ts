@@ -55,6 +55,13 @@ describe('CourtService', () => {
     fullName: 'Owner Name',
   };
 
+  const mockRegularUser: UserPayload = {
+    sub: 'user-uuid',
+    email: 'user@example.com',
+    role: Role.USER,
+    fullName: 'Regular User',
+  };
+
   beforeEach(async () => {
     prisma = mockDeep<PrismaClient>();
     mailerService = mockDeep<MailerService>();
@@ -216,11 +223,11 @@ describe('CourtService', () => {
 
   describe('2. Read Courts (findAll & findOne)', () => {
     describe('findAll', () => {
-      it('should filter out soft-deleted courts (isDeleted: false)', async () => {
+      it('should filter out soft-deleted courts (isDeleted: false) for regular users', async () => {
         prisma.court.findMany.mockResolvedValue([mockCourt]);
         prisma.court.count.mockResolvedValue(1);
 
-        await service.findAll(mockUser, {});
+        await service.findAll(mockRegularUser, {});
 
         expect(prisma.court.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -231,7 +238,7 @@ describe('CourtService', () => {
         );
       });
 
-      it('should apply pagination and search logic correctly', async () => {
+      it('should apply pagination and search logic correctly for regular users', async () => {
         prisma.court.findMany.mockResolvedValue([mockCourt]);
         prisma.court.count.mockResolvedValue(1);
 
@@ -240,7 +247,7 @@ describe('CourtService', () => {
           limit: 5,
           search: 'Stadium',
         };
-        await service.findAll(mockUser, query);
+        await service.findAll(mockRegularUser, query);
 
         expect(prisma.court.findMany).toHaveBeenCalledWith({
           where: expect.objectContaining({
@@ -259,6 +266,28 @@ describe('CourtService', () => {
             },
           },
         });
+      });
+
+      it('should NOT filter isDeleted for ADMIN users (Bug 2 fix)', async () => {
+        prisma.court.findMany.mockResolvedValue([mockCourt]);
+        prisma.court.count.mockResolvedValue(1);
+
+        await service.findAll(mockUser, {});
+
+        expect(prisma.court.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.not.objectContaining({
+              isDeleted: false,
+            }),
+          }),
+        );
+        expect(prisma.court.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              ownerId: mockUser.sub,
+            }),
+          }),
+        );
       });
     });
 
