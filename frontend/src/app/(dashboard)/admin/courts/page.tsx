@@ -137,10 +137,22 @@ export default function AdminCourtsPage() {
     mutationFn: (id: string) => courtService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["courts"] });
-      toast.success("Đã xóa sân thành công");
+      setCourtToDelete(null); // Fix Bug 4: Close modal
+      toast.success("Đã ngừng hoạt động sân thành công"); // Fix Bug 3: Wording
     },
     onError: () => {
-      toast.error("Không thể xóa sân. Vui lòng thử lại.");
+      toast.error("Không thể ngừng hoạt động sân. Vui lòng thử lại."); // Fix Bug 3: Wording
+    }
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => courtService.reactivate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courts"] });
+      toast.success("Đã kích hoạt lại sân thành công");
+    },
+    onError: () => {
+      toast.error("Không thể kích hoạt lại sân. Vui lòng thử lại.");
     }
   });
 
@@ -187,6 +199,20 @@ export default function AdminCourtsPage() {
       ),
     },
     {
+      accessorKey: "isDeleted",
+      header: "Trạng thái",
+      cell: ({ row }) => {
+        const isDeleted = row.original.isDeleted;
+        return (
+          <div className={`px-2 py-1 rounded-full text-[10px] font-black uppercase text-center w-fit ${
+            isDeleted ? "bg-destructive/10 text-destructive border border-destructive/20" : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+          }`}>
+            {isDeleted ? "Ngừng hoạt động" : "Đang hoạt động"}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "amenities",
       header: "Tiện ích",
       cell: ({ row }) => {
@@ -224,9 +250,21 @@ export default function AdminCourtsPage() {
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setCourtToDelete(court.id)} className="text-destructive focus:text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" /> Ngừng hoạt động
-              </DropdownMenuItem>
+              {court.isDeleted ? (
+                <DropdownMenuItem 
+                  onClick={() => reactivateMutation.mutate(court.id)} 
+                  className="text-emerald-600 focus:text-emerald-700"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Kích hoạt lại
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem 
+                  onClick={() => setCourtToDelete(court.id)} 
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Ngừng hoạt động
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

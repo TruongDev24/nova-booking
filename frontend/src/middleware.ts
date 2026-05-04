@@ -15,6 +15,11 @@ export function middleware(request: NextRequest) {
 
   // 1. If trying to access protected routes without a token
   if (!token) {
+    // Skip protection for /admin/register
+    if (pathname === '/admin/register') {
+      return NextResponse.next();
+    }
+    
     if (pathname.startsWith('/admin') || pathname.startsWith('/user')) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
@@ -27,7 +32,7 @@ export function middleware(request: NextRequest) {
     const userRole = decoded.role;
 
     // 3. Logic for Admin routes
-    if (pathname.startsWith('/admin')) {
+    if (pathname.startsWith('/admin') && pathname !== '/admin/register') {
       if (userRole !== 'ADMIN') {
         // Not an admin? Redirect to home or user dashboard
         return NextResponse.redirect(new URL('/', request.url));
@@ -36,7 +41,11 @@ export function middleware(request: NextRequest) {
 
     // 4. Logic for User routes
     if (pathname.startsWith('/user')) {
-      if (userRole !== 'USER' && userRole !== 'ADMIN') {
+      if (userRole === 'ADMIN') {
+        // Admins should stay in the admin panel
+        return NextResponse.redirect(new URL('/admin', request.url));
+      }
+      if (userRole !== 'USER') {
         return NextResponse.redirect(new URL('/login', request.url));
       }
     }

@@ -16,6 +16,7 @@ import {
   Search,
 } from "lucide-react";
 import Cookies from "js-cookie";
+import { authService } from "@/services/auth.service";
 
 import {
   Sidebar,
@@ -222,11 +223,11 @@ export function DashboardLayout({
                   </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem asChild>
-                    <Link href={profileHref} className="flex w-full items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Hồ sơ</span>
-                    </Link>
+                  <DropdownMenuItem render={
+                    <Link href={profileHref} className="flex w-full items-center" />
+                  }>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Hồ sơ</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
                     <Settings className="mr-2 h-4 w-4" />

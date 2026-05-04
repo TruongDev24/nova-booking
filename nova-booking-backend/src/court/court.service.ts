@@ -53,12 +53,12 @@ export class CourtService {
     const skip = (page - 1) * limit;
 
     // Build WHERE clause safely
-    const where: Prisma.CourtWhereInput = {
-      isDeleted: false,
-    };
+    const where: Prisma.CourtWhereInput = {};
 
     if (user.role === Role.ADMIN) {
       where.ownerId = user.sub;
+    } else {
+      where.isDeleted = false;
     }
 
     // Explicit search validation to prevent crashes
@@ -123,7 +123,9 @@ export class CourtService {
     }
   }
 
-  async findOne(id: string): Promise<any> {
+  async findOne(
+    id: string,
+  ): Promise<Court & { avgRating: number; totalReviews: number }> {
     const court = await this.prisma.court.findUnique({
       where: { id },
       include: {
@@ -260,7 +262,7 @@ export class CourtService {
       });
 
       // Thực thi gửi mail song song, không làm fail transaction nếu 1 mail lỗi
-      Promise.allSettled(emailPromises).then((results) => {
+      void Promise.allSettled(emailPromises).then((results) => {
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
             console.error(
@@ -271,5 +273,24 @@ export class CourtService {
         });
       });
     }
+  }
+
+  async reactivate(id: string, ownerId: string): Promise<Court> {
+    const court = await this.prisma.court.findUnique({
+      where: { id },
+    });
+
+    if (!court) {
+      throw new NotFoundException(`Sân với ID ${id} không tồn tại`);
+    }
+
+    if (court.ownerId !== ownerId) {
+      throw new ForbiddenException('Bạn không có quyền kích hoạt lại sân này');
+    }
+
+    return this.prisma.court.update({
+      where: { id },
+      data: { isDeleted: false },
+    });
   }
 }

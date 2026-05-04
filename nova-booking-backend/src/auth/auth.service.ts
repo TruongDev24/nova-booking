@@ -15,6 +15,7 @@ import * as bcrypt from 'bcrypt';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
 import { RegisterDto } from './dto/register.dto';
+import { AdminRegisterDto } from './dto/admin-register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Role } from '@prisma/client';
 import { UserPayload } from '../common/interfaces/user-payload.interface';
@@ -43,10 +44,45 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(registerDto.password, salt);
 
     const user = await this.usersService.create({
-      ...registerDto,
+      email: registerDto.email,
+      fullName: registerDto.fullName,
+      phone: registerDto.phone,
+      avatar: registerDto.avatar,
       password: hashedPassword,
+      role: Role.USER, // Hardcode role to USER for public registration
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...result } = user;
+    return result;
+  }
+
+  async registerAdmin(dto: AdminRegisterDto) {
+    if (dto.secretKey !== this.configService.get('ADMIN_REGISTRATION_SECRET')) {
+      throw new UnauthorizedException('Invalid admin secret key');
+    }
+
+    const existingUser = await this.usersService.findByEmailOrPhone(
+      dto.email,
+      dto.phone,
+    );
+    if (existingUser) {
+      throw new ConflictException('User already exists');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(dto.password, salt);
+
+    const user = await this.usersService.create({
+      email: dto.email,
+      fullName: dto.fullName,
+      phone: dto.phone,
+      avatar: dto.avatar,
+      password: hashedPassword,
+      role: Role.ADMIN,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...result } = user;
     return result;
   }
@@ -107,15 +143,20 @@ export class AuthService {
       };
     }
 
-    const resetToken = crypto.randomUUID();
+    // Secure token generation and hashing
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
     const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
     await this.usersService.update(user.id, {
-      resetToken,
+      resetToken: hashedToken,
       resetTokenExpiry,
     });
 
-    const resetLink = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
+    const resetLink = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${rawToken}`;
 
     try {
       await this.mailerService.sendMail({
@@ -155,7 +196,13 @@ export class AuthService {
   }
 
   async resetPassword(dto: ResetPasswordDto) {
-    const user = await this.usersService.findByResetToken(dto.token);
+    // Hash the incoming raw token to compare with stored hash
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(dto.token)
+      .digest('hex');
+
+    const user = await this.usersService.findByResetToken(hashedToken);
     if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
       throw new BadRequestException('Invalid or expired reset token');
     }

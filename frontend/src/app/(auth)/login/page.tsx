@@ -264,7 +264,7 @@ export default function LoginPage() {
           )}
 
           {/* Footer Link */}
-          <div className="mt-8 text-center">
+          <div className="mt-8 text-center space-y-4">
             <p className="text-sm text-slate-600">
               Don&apos;t have an account?{" "}
               <Link
@@ -274,6 +274,17 @@ export default function LoginPage() {
                 Sign Up
               </Link>
             </p>
+            <div className="pt-4 border-t border-slate-100">
+              <p className="text-xs text-slate-500">
+                Dành cho chủ sân:{" "}
+                <Link
+                  href="/admin/register"
+                  className="font-semibold text-indigo-600 hover:text-indigo-500 transition-colors"
+                >
+                  Đăng ký tài khoản Admin
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>

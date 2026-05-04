@@ -5,10 +5,8 @@ import {
   IsString,
   MinLength,
   MaxLength,
-  IsEnum,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { Role } from '@prisma/client';
 
 export class RegisterDto {
   @Transform(({ value }: { value: string | undefined }) => value?.trim())
@@ -35,8 +33,4 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   avatar?: string;
-
-  @IsEnum(Role, { message: 'Role must be either USER or ADMIN' })
-  @IsOptional()
-  role?: Role = Role.USER;
 }

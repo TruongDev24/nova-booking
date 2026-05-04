@@ -14,21 +14,24 @@ jest.mock('bcrypt');
 describe('AuthService', () => {
   let service: AuthService;
 
-  const mockUsersService: any = {
+  const mockUsersService = {
     findByEmailOrPhone: jest.fn(),
     create: jest.fn(),
     findByEmail: jest.fn(),
+    findById: jest.fn(),
+    update: jest.fn(),
+    findByResetToken: jest.fn(),
   };
 
-  const mockJwtService: any = {
+  const mockJwtService = {
     sign: jest.fn(),
   };
 
-  const mockMailerService: any = {
+  const mockMailerService = {
     sendMail: jest.fn(),
   };
 
-  const mockConfigService: any = {
+  const mockConfigService = {
     get: jest.fn().mockReturnValue('http://localhost:3000'),
   };
 
@@ -100,9 +103,13 @@ describe('AuthService', () => {
 
     it('Scenario 2 (Conflict Error - Email Exists): Nên báo lỗi nếu email đã tồn tại', async () => {
       // Mock: Email đã tồn tại
-      mockUsersService.findByEmailOrPhone.mockResolvedValue({ id: 'existing-id' });
+      mockUsersService.findByEmailOrPhone.mockResolvedValue({
+        id: 'existing-id',
+      });
 
-      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+      await expect(service.register(registerDto)).rejects.toThrow(
+        ConflictException,
+      );
 
       // Verify: Không gọi hàm tạo người dùng
       expect(mockUsersService.create).not.toHaveBeenCalled();

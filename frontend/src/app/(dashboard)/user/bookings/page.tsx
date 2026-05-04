@@ -18,7 +18,6 @@ import { toast, Toaster } from "react-hot-toast";
 import { formatToVietnamDate } from "@/utils/date-format";
 import Image from "next/image";
 import { ReviewDialog } from "@/components/reviews/ReviewDialog";
-import { useRouter, useSearchParams } from "next/navigation";
 
 interface Booking {
   id: string;
@@ -35,14 +34,17 @@ interface Booking {
     images: string[];
   };
   createdAt: string;
+  review?: {
+    id: string;
+    rating: number;
+    comment: string;
+  } | null;
 }
 
 export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
   const fetchBookings = React.useCallback(async () => {
     try {
@@ -58,7 +60,10 @@ export default function MyBookingsPage() {
   }, []);
 
   useEffect(() => {
-    void fetchBookings();
+    const timer = setTimeout(() => {
+      void fetchBookings();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchBookings]);
 
   const handlePayment = async (bookingId: string) => {
@@ -69,7 +74,7 @@ export default function MyBookingsPage() {
       const { checkoutUrl } = await paymentService.createLink(bookingId);
       
       toast.success("Đang chuyển hướng đến cổng thanh toán", { id: "payment" });
-      window.location.href = checkoutUrl;
+      window.location.assign(checkoutUrl);
     } catch (error) {
       console.error(error);
       toast.error("Không thể tạo liên kết thanh toán", { id: "payment" });

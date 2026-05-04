@@ -48,9 +48,6 @@ const registerSchema = z
       .regex(/[A-Z]/, "Password must contain at least 1 uppercase letter")
       .regex(/[0-9]/, "Password must contain at least 1 number"),
     confirmPassword: z.string(),
-    role: z.enum(["USER", "ADMIN"], {
-          message: "Role must be USER or ADMIN"
-    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -67,8 +64,6 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -78,12 +73,8 @@ export default function RegisterPage() {
       phone: "",
       password: "",
       confirmPassword: "",
-      role: "USER",
     },
   });
-
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const selectedRole = watch("role");
 
   const onSubmit = async (data: RegisterFormValues) => {
     try {
@@ -94,14 +85,13 @@ export default function RegisterPage() {
           email: data.email,
           phone: data.phone,
           password: data.password,
-          role: data.role,
         }
       );
 
       // Save token to Cookies for middleware compatibility
       const token = response.data?.access_token;
       const user = response.data?.user;
-      const userRole = user?.role || data.role; // Fallback to form role
+      const userRole = user?.role || "USER";
 
       if (token) {
         Cookies.set("access_token", token, { path: "/" });
@@ -113,7 +103,7 @@ export default function RegisterPage() {
 
       toast.success("Account created successfully!");
       
-      // Redirect based on role
+      // Redirect based on role (always USER here, but keep logic for safety)
       setTimeout(() => {
         if (userRole === "ADMIN") {
           router.push("/admin");
@@ -159,34 +149,6 @@ export default function RegisterPage() {
 
         <div className="p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <div className="bg-slate-50 p-1.5 rounded-xl flex gap-1 border border-slate-200">
-              <button
-                type="button"
-                onClick={() => setValue("role", "USER")}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
-                  selectedRole === "USER"
-                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Người chơi (USER)
-              </button>
-              <button
-                type="button"
-                onClick={() => setValue("role", "ADMIN")}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
-                  selectedRole === "ADMIN"
-                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Chủ sân (ADMIN)
-              </button>
-            </div>
-            {errors.role && (
-              <p className="text-xs text-red-500 text-center">{errors.role.message}</p>
-            )}
-
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Full Name
@@ -355,7 +317,18 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-3">
+            <div className="py-2 px-4 bg-indigo-50 rounded-lg border border-indigo-100">
+              <p className="text-sm text-indigo-700">
+                Bạn là chủ sân?{" "}
+                <Link
+                  href="/admin/register"
+                  className="font-bold text-indigo-800 hover:text-indigo-600 underline transition-colors"
+                >
+                  Đăng ký quản trị tại đây
+                </Link>
+              </p>
+            </div>
             <p className="text-sm text-slate-600">
               Already have an account?{" "}
               <Link

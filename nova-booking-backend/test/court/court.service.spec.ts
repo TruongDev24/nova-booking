@@ -71,8 +71,8 @@ describe('CourtService', () => {
       _count: { _all: 0 },
       _min: { rating: 0 },
       _max: { rating: 0 },
-      _sum: { rating: 0 }
-    } as any);
+      _sum: { rating: 0 },
+    });
 
     cloudinaryService = {
       deleteFiles: jest.fn(),
@@ -132,7 +132,7 @@ describe('CourtService', () => {
       ];
 
       prisma.court.findUnique.mockResolvedValue(mockCourt);
-      prisma.booking.findMany.mockResolvedValue(futureBookings as any);
+      prisma.booking.findMany.mockResolvedValue(futureBookings as any); // eslint-disable-line @typescript-eslint/no-unsafe-argument
 
       await service.remove(mockCourtId, mockOwnerId);
 
@@ -169,7 +169,7 @@ describe('CourtService', () => {
       ];
 
       prisma.court.findUnique.mockResolvedValue(mockCourt);
-      prisma.booking.findMany.mockResolvedValue(futureBookings as any);
+      prisma.booking.findMany.mockResolvedValue(futureBookings as any); // eslint-disable-line @typescript-eslint/no-unsafe-argument
 
       // Mail 1 thành công, Mail 2 thất bại
       mailerService.sendMail

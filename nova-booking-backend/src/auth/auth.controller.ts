@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
+import { AdminRegisterDto } from './dto/admin-register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -26,6 +27,12 @@ export class AuthController {
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
+  }
+
+  @Public()
+  @Post('admin/register')
+  async registerAdmin(@Body() adminRegisterDto: AdminRegisterDto) {
+    return this.authService.registerAdmin(adminRegisterDto);
   }
 
   @Public()

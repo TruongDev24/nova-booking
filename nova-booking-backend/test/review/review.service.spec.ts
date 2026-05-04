@@ -1,7 +1,12 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewService } from '../../src/review/review.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 
 describe('ReviewService', () => {
   let service: ReviewService;
@@ -31,7 +36,7 @@ describe('ReviewService', () => {
 
     service = module.get<ReviewService>(ReviewService);
     prisma = module.get<PrismaService>(PrismaService);
-    
+
     jest.clearAllMocks();
   });
 
@@ -63,7 +68,7 @@ describe('ReviewService', () => {
       const result = await service.create(userId, dto);
 
       expect(result).toBeDefined();
-      expect(prisma.review.create).toHaveBeenCalledWith({
+      expect(prisma.review.create as jest.Mock).toHaveBeenCalledWith({
         data: {
           rating: dto.rating,
           comment: dto.comment,
@@ -81,7 +86,9 @@ describe('ReviewService', () => {
         status: 'COMPLETED',
       });
 
-      await expect(service.create(userId, dto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(userId, dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('Scenario 3 (Invalid Status Error): Nên báo lỗi nếu đơn hàng chưa hoàn tất', async () => {
@@ -91,7 +98,9 @@ describe('ReviewService', () => {
         status: 'CONFIRMED',
       });
 
-      await expect(service.create(userId, dto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(userId, dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('Scenario 4 (Duplicate Review Error): Nên báo lỗi nếu đã có đánh giá cho đơn hàng này', async () => {
@@ -102,13 +111,17 @@ describe('ReviewService', () => {
         review: { id: 'existing-review' },
       });
 
-      await expect(service.create(userId, dto)).rejects.toThrow(ConflictException);
+      await expect(service.create(userId, dto)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('Nên báo lỗi nếu không tìm thấy đơn hàng', async () => {
       (prisma.booking.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.create(userId, dto)).rejects.toThrow(NotFoundException);
+      await expect(service.create(userId, dto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -116,7 +129,12 @@ describe('ReviewService', () => {
     it('Scenario 5 (Pagination): Nên trả về danh sách đánh giá có phân trang', async () => {
       const courtId = 'court-1';
       const mockReviews = [
-        { id: 'r1', rating: 5, comment: 'Good', user: { fullName: 'User A', avatar: null } },
+        {
+          id: 'r1',
+          rating: 5,
+          comment: 'Good',
+          user: { fullName: 'User A', avatar: null },
+        },
       ];
       const mockCount = 1;
 
@@ -134,7 +152,7 @@ describe('ReviewService', () => {
           lastPage: 1,
         },
       });
-      expect(prisma.review.findMany).toHaveBeenCalled();
+      expect(prisma.review.findMany as jest.Mock).toHaveBeenCalled();
     });
   });
 });

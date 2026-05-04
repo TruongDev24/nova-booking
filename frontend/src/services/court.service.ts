@@ -13,6 +13,7 @@ export interface Court {
   ownerId: string;
   avgRating: number;
   totalReviews: number;
+  isDeleted: boolean;
 }
 
 export interface PaginatedCourts {
@@ -54,6 +55,11 @@ export const courtService = {
 
   delete: async (id: string) => {
     const response = await apiClient.delete(`/courts/${id}`);
+    return response.data;
+  },
+
+  reactivate: async (id: string) => {
+    const response = await apiClient.post(`/courts/${id}/reactivate`);
     return response.data;
   },
 };

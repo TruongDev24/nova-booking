@@ -126,4 +126,10 @@ export class CourtController {
   remove(@Param('id') id: string, @GetUser('sub') userId: string) {
     return this.courtService.remove(id, userId);
   }
+
+  @Post(':id/reactivate')
+  @Roles(Role.ADMIN)
+  reactivate(@Param('id') id: string, @GetUser('sub') userId: string) {
+    return this.courtService.reactivate(id, userId);
+  }
 }

@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PayOS } from '@payos/node';
 import { PrismaService } from '../prisma/prisma.service';
@@ -40,8 +44,9 @@ export class PaymentService {
       data: { payosOrderCode: orderCode },
     });
 
-    const domain = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    
+    const domain =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+
     const body = {
       orderCode: orderCode,
       amount: booking.totalPrice,
@@ -59,13 +64,14 @@ export class PaymentService {
     }
   }
 
-  async handleWebhook(body: any) {
+  async handleWebhook(body: unknown) {
     // For PayOS v2, verify returns a promise of WebhookData
-    const verifiedData = await this.payos.webhooks.verify(body);
-    
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    const verifiedData = await this.payos.webhooks.verify(body as any);
+
     if (verifiedData.code === '00') {
       const orderCode = verifiedData.orderCode;
-      
+
       const booking = await this.prisma.booking.findUnique({
         where: { payosOrderCode: orderCode },
       });
@@ -73,12 +79,12 @@ export class PaymentService {
       if (booking) {
         await this.prisma.booking.update({
           where: { id: booking.id },
-          data: { 
+          data: {
             paymentStatus: 'PAID',
-            status: 'CONFIRMED'
+            status: 'CONFIRMED',
           },
         });
-        
+
         await this.prisma.payment.upsert({
           where: { bookingId: booking.id },
           update: { status: 'PAID' },
@@ -89,11 +95,11 @@ export class PaymentService {
             method: 'BANK_TRANSFER',
             status: 'PAID',
             transactionId: verifiedData.paymentLinkId,
-          }
+          },
         });
       }
     }
-    
+
     return { success: true };
   }
 }
