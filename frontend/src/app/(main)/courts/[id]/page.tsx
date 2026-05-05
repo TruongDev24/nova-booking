@@ -91,23 +91,30 @@ export default function CourtDetailPage({ params }: PageProps) {
     }
 
     setBookingLoading(true);
+    const loadingToast = toast.loading("Đang khởi tạo giao dịch...");
+
     try {
       const totalAmount = selectedSlots.length * (court?.pricePerHour || 0);
       
-      await bookingService.createBooking({
+      const res = await bookingService.createBooking({
         courtId: id,
         bookingDate: selectedDate,
         slots: selectedSlots,
         totalPrice: totalAmount,
       });
       
-      toast.success("Đặt lịch thành công!");
-      setSelectedSlots([]);
-      await fetchSlots();
+      toast.success("Đang chuyển hướng đến cổng thanh toán...", { id: loadingToast });
+      
+      if (res.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+      } else {
+        throw new Error("Không nhận được link thanh toán");
+      }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string }, status?: number } };
       const message = err.response?.data?.message || "Đặt sân thất bại. Vui lòng thử lại.";
-      toast.error(message);
+      toast.error(message, { id: loadingToast });
+      
       if (err.response?.status === 401) {
         router.push("/login");
       }
@@ -241,6 +248,31 @@ export default function CourtDetailPage({ params }: PageProps) {
                 </p>
               </div>
             </section>
+
+            {/* Amenities Section */}
+            {court.amenities && court.amenities.length > 0 && (
+              <section className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <h2 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+                  Tiện ích đi kèm
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                  {court.amenities.map((amenity, idx) => (
+                    <div 
+                      key={idx} 
+                      className="flex items-center gap-4 group transition-all duration-300 hover:translate-x-2"
+                    >
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-300">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                      <span className="text-slate-700 font-bold text-lg tracking-tight">
+                        {amenity}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
 
           {/* Right: Booking Engine (4 cols) */}

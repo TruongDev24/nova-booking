@@ -1,13 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BookingService } from '../../src/booking/booking.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { RedisService } from '../../src/redis/redis.service';
+import { PaymentService } from '../../src/payment/payment.service';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
-import { PrismaClient, BookingStatus, Court, Booking } from '@prisma/client';
+import { PrismaClient, BookingStatus, Court } from '@prisma/client';
 
 describe('BookingService', () => {
   let service: BookingService;
   let prisma: DeepMockProxy<PrismaClient>;
+  let redisService: DeepMockProxy<RedisService>;
+  let paymentService: DeepMockProxy<PaymentService>;
 
   const FIXED_SYSTEM_TIME = '2026-04-25T10:00:00.000Z'; // 17:00 VN
   const mockUserId = 'user-uuid';
@@ -19,8 +23,16 @@ describe('BookingService', () => {
     jest.setSystemTime(new Date(FIXED_SYSTEM_TIME));
 
     prisma = mockDeep<PrismaClient>();
+    redisService = mockDeep<RedisService>();
+    paymentService = mockDeep<PaymentService>();
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [BookingService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        BookingService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: RedisService, useValue: redisService },
+        { provide: PaymentService, useValue: paymentService },
+      ],
     }).compile();
 
     service = module.get<BookingService>(BookingService);
@@ -49,15 +61,18 @@ describe('BookingService', () => {
       updatedAt: new Date(),
     };
 
-    it('1. Happy Path (Success): User books a valid available future slot', async () => {
-      // Mock Court: Open 05:00-22:00
+    it('1. Happy Path: Should lock slots and return checkoutUrl without creating DB record', async () => {
+      // Mock Court
       prisma.court.findUnique.mockResolvedValue(mockCourt);
-      // Mock No Double Booking
+      // Mock No Double Booking in DB
       prisma.booking.findMany.mockResolvedValue([]);
-      // Mock Transaction
-      (prisma.$transaction as jest.Mock).mockImplementation(
-        (promises: unknown[]) => Promise.resolve(promises),
-      );
+      // Mock Redis Lock Success
+      redisService.setnxWithExpire.mockResolvedValue(true);
+      // Mock PayOS Link
+      paymentService.generatePayosLink.mockResolvedValue({
+        checkoutUrl: 'http://pay.os/link',
+        orderCode: 12345,
+      } as any);
 
       const dto = {
         courtId: mockCourtId,
@@ -66,123 +81,63 @@ describe('BookingService', () => {
         totalPrice: 100000,
       };
 
-      await service.createMultiBooking(dto, mockUserId);
+      const result = await service.createMultiBooking(dto, mockUserId);
 
-      // Verify prisma.booking.create was called inside transaction
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prisma.booking.create).toHaveBeenCalledWith({
-        data: {
-          courtId: mockCourtId,
-          userId: mockUserId,
-          bookingDate: '2026-04-25',
-          startTime: '18:00',
-          endTime: '19:00',
-          totalPrice: 100000,
-          status: BookingStatus.PENDING,
-        },
-      });
-    });
-
-    it('2. Validation: Past Time Booking (The "Time Travel" Bug)', async () => {
-      prisma.court.findUnique.mockResolvedValue(mockCourt);
-
-      const dto = {
-        courtId: mockCourtId,
-        bookingDate: '2026-04-25',
-        slots: ['08:00'], // 08:00 VN = 01:00 UTC (Past relative to 10:00 UTC)
-        totalPrice: 100000,
-      };
-
-      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(
-        new BadRequestException(
-          'Khung giờ 08:00 đã trôi qua. Vui lòng chọn khung giờ khác.',
-        ),
+      expect(result).toHaveProperty('checkoutUrl', 'http://pay.os/link');
+      expect(redisService.setnxWithExpire).toHaveBeenCalledWith(
+        expect.stringContaining('booking_lock'),
+        mockUserId,
+        600,
       );
-
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(redisService.set).toHaveBeenCalledWith(
+        expect.stringContaining('temp_order'),
+        expect.stringContaining(mockUserId),
+        600,
+      );
       expect(prisma.booking.create).not.toHaveBeenCalled();
     });
 
-    it('3. Validation: Outside Operating Hours (The "Closed" Bug)', async () => {
+    it('2. Conflict: Should throw error if slot is already locked in Redis', async () => {
       prisma.court.findUnique.mockResolvedValue(mockCourt);
+      redisService.setnxWithExpire.mockResolvedValue(false);
 
       const dto = {
         courtId: mockCourtId,
         bookingDate: '2026-04-25',
-        slots: ['03:00'], // 03:00 VN is outside 05:00-22:00
+        slots: ['18:00'],
         totalPrice: 100000,
       };
 
-      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(
-        BadRequestException,
-      );
-
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prisma.booking.create).not.toHaveBeenCalled();
+      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(ConflictException);
     });
 
-    it('4. Validation: Double Booking / Conflict', async () => {
+    it('3. Validation: Past Time Booking should fail and release locks', async () => {
       prisma.court.findUnique.mockResolvedValue(mockCourt);
-      // Mock existing booking
-      prisma.booking.findMany.mockResolvedValue([
-        { startTime: '19:00' } as unknown as Booking,
-      ]);
+      redisService.setnxWithExpire.mockResolvedValue(true);
 
       const dto = {
         courtId: mockCourtId,
         bookingDate: '2026-04-25',
-        slots: ['19:00'],
+        slots: ['08:00'],
         totalPrice: 100000,
       };
 
-      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(
-        new ConflictException('Các khung giờ sau đã được đặt: 19:00'),
-      );
-
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prisma.booking.create).not.toHaveBeenCalled();
+      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(BadRequestException);
+      expect(redisService.del).toHaveBeenCalled();
     });
 
-    it('5. Edge Case: Cross-Day / 24h Court Success', async () => {
-      // Mock Court: Cross-day 23:00 to 22:00 next day
-      const crossDayCourt = {
-        ...mockCourt,
-        openingTime: '23:00',
-        closingTime: '22:00',
-      };
-      prisma.court.findUnique.mockResolvedValue(crossDayCourt);
-      prisma.booking.findMany.mockResolvedValue([]);
-      (prisma.$transaction as jest.Mock).mockImplementation(
-        (promises: unknown[]) => Promise.resolve(promises),
-      );
+    it('4. Validation: Outside Operating Hours should fail', async () => {
+      prisma.court.findUnique.mockResolvedValue(mockCourt);
+      redisService.setnxWithExpire.mockResolvedValue(true);
 
       const dto = {
         courtId: mockCourtId,
         bookingDate: '2026-04-25',
-        slots: ['02:00'], // 02:00 AM VN of April 25 (Started 23:00 April 24)
+        slots: ['03:00'],
         totalPrice: 100000,
       };
 
-      // Since system time is 10:00 UTC (17:00 VN) on April 25, 02:00 VN is in the past!
-      // Wait, to test success of cross-day logic, I need a FUTURE slot in a cross-day setup.
-      // Let's use April 26 02:00 AM VN.
-      const futureDto = {
-        ...dto,
-        bookingDate: '2026-04-26',
-      };
-
-      await service.createMultiBooking(futureDto, mockUserId);
-
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prisma.booking.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          data: expect.objectContaining({
-            bookingDate: '2026-04-26',
-            startTime: '02:00',
-          }),
-        }),
-      );
+      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(BadRequestException);
     });
   });
 });

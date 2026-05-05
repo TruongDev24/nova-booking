@@ -40,6 +40,9 @@ export class BookingController {
     @Body() createBookingDto: CreateBookingDto,
     @GetUser() user: UserPayload,
   ) {
+    console.log('--- DEBUG BOOKING PAYLOAD ---');
+    console.log('User ID:', user.sub);
+    console.log('Payload:', JSON.stringify(createBookingDto, null, 2));
     return this.bookingService.createMultiBooking(createBookingDto, user.sub);
   }
 

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { 
   Plus, Map as MapIcon, Edit, Trash2, X, Loader2, 
-  Camera, Wifi, Coffee, Car, ShoppingBag, 
+  Camera, 
   MoreHorizontal
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -39,13 +39,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 // --- Configuration ---
-const AMENITIES_LIST = [
-  { id: "wifi", label: "Wifi", icon: Wifi },
-  { id: "parking", label: "Bãi xe", icon: Car },
-  { id: "canteen", label: "Canteen", icon: Coffee },
-  { id: "rental", label: "Cho thuê vợt", icon: ShoppingBag },
-];
-
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
@@ -61,10 +54,7 @@ const courtSchema = z.object({
     .max(255, "Địa chỉ quá dài"),
   pricePerHour: z.number({ message: "Giá tiền phải là số" })
     .min(0, "Giá tiền không được âm")
-    .max(2000000, "Giá tiền quá lớn (tối đa 2.000.000đ)")
-    .refine((val) => val % 1000 === 0, {
-      message: "Giá tiền phải là bội số của 1.000 (VD: 50.000, 120.000)",
-    }),
+    .max(2000000, "Giá tiền quá lớn (tối đa 2.000.000đ)"),
   description: z.string().optional(),
   openingTime: z.string().min(1, "Vui lòng chọn giờ mở cửa"),
   closingTime: z.string().min(1, "Vui lòng chọn giờ đóng cửa"),
@@ -81,6 +71,7 @@ export default function AdminCourtsPage() {
   
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [amenityInput, setAmenityInput] = useState("");
 
   const {
     register,
@@ -218,15 +209,15 @@ export default function AdminCourtsPage() {
       cell: ({ row }) => {
         const amenities = row.original.amenities as string[] || [];
         return (
-          <div className="flex gap-1">
-            {amenities.slice(0, 3).map((a) => {
-               const amenity = AMENITIES_LIST.find(item => item.id === a);
-               return (
-                 <div key={a} className="w-6 h-6 rounded-full bg-muted border flex items-center justify-center" title={amenity?.label || a}>
-                    {amenity?.icon ? React.createElement(amenity.icon, { className: "w-3 h-3 text-muted-foreground" }) : "•"}
-                 </div>
-               );
-            })}
+          <div className="flex flex-wrap gap-1 max-w-[150px]">
+            {amenities.slice(0, 3).map((a) => (
+              <div 
+                key={a} 
+                className="px-2 py-0.5 rounded-md bg-muted border text-[10px] font-bold text-muted-foreground whitespace-nowrap"
+              >
+                {a}
+              </div>
+            ))}
             {amenities.length > 3 && <span className="text-[10px] text-muted-foreground self-center">+{amenities.length - 3}</span>}
           </div>
         );
@@ -310,13 +301,19 @@ export default function AdminCourtsPage() {
     setIsModalOpen(true);
   };
 
-  const toggleAmenity = (id: string) => {
-    const current = watchAmenities;
-    if (current.includes(id)) {
-      setValue("amenities", current.filter(item => item !== id));
-    } else {
-      setValue("amenities", [...current, id]);
+  const addAmenity = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const val = amenityInput.trim().replace(/,$/, "");
+      if (val && !watchAmenities.includes(val)) {
+        setValue("amenities", [...watchAmenities, val]);
+        setAmenityInput("");
+      }
     }
+  };
+
+  const removeAmenity = (val: string) => {
+    setValue("amenities", watchAmenities.filter(item => item !== val));
   };
 
   const onFormSubmit = async (data: CourtFormValues) => {
@@ -469,6 +466,7 @@ export default function AdminCourtsPage() {
                     {...register("pricePerHour", { valueAsNumber: true })} 
                     className={`w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none transition-all font-bold text-sm ${errors.pricePerHour ? 'border-destructive' : 'focus:border-primary focus:bg-background'}`} 
                   />
+                  {errors.pricePerHour && <p className="text-destructive mt-1 text-[10px] font-bold uppercase">{errors.pricePerHour.message}</p>}
                 </div>
 
                 <div>
@@ -492,22 +490,33 @@ export default function AdminCourtsPage() {
 
               <div className="space-y-3">
                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tiện ích đi kèm</label>
-                 <div className="flex flex-wrap gap-2">
-                    {AMENITIES_LIST.map((item) => (
-                       <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => toggleAmenity(item.id)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[11px] font-black uppercase transition-all ${
-                             watchAmenities.includes(item.id)
-                             ? "bg-primary border-primary text-primary-foreground shadow-md"
-                             : "bg-background text-muted-foreground hover:border-primary"
-                          }`}
+                 <div className="flex flex-wrap gap-2 mb-2">
+                    {watchAmenities.map((item) => (
+                       <div
+                          key={item}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-[11px] font-black uppercase text-primary animate-in zoom-in duration-200"
                        >
-                          <item.icon className="w-3.5 h-3.5" />
-                          {item.label}
-                       </button>
+                          {item}
+                          <button 
+                            type="button" 
+                            onClick={() => removeAmenity(item)}
+                            className="hover:text-destructive transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                       </div>
                     ))}
+                 </div>
+                 <div className="relative">
+                   <input
+                      type="text"
+                      value={amenityInput}
+                      onChange={(e) => setAmenityInput(e.target.value)}
+                      onKeyDown={addAmenity}
+                      placeholder="Nhập tiện ích (VD: Trà đá miễn phí, Wifi...) và nhấn Enter"
+                      className="w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none focus:border-primary focus:bg-background font-bold text-sm transition-all"
+                   />
+                   <Plus className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
                  </div>
               </div>
 

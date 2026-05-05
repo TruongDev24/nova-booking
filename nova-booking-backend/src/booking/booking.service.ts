@@ -4,15 +4,24 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingStatus, Prisma } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { RedisService } from '../redis/redis.service';
+import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
 export class BookingService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(BookingService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private redisService: RedisService,
+    private paymentService: PaymentService,
+  ) {}
 
   async getDailySlots(courtId: string, date: string) {
     const court = await this.prisma.court.findUnique({
@@ -38,12 +47,28 @@ export class BookingService {
       },
     });
 
+    // Get active locks from Redis (Pending payments)
+    let lockedStartTimes: string[] = [];
+    try {
+      const lockPattern = `booking_lock:${courtId}:${date}:*`;
+      const lockedSlots = await this.redisService.getKeys(lockPattern);
+      lockedStartTimes = lockedSlots.map((key) => key.split(':').pop() || '');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        'Failed to fetch Redis locks, continuing with DB data only:',
+        message,
+      );
+    }
+
     const slots: Array<{
       startTime: string;
       endTime: string;
       isBooked: boolean;
+      isPending: boolean;
       isPast: boolean;
       isClosed: boolean;
+      available: boolean;
       price: number;
     }> = [];
 
@@ -93,15 +118,18 @@ export class BookingService {
         );
       }
 
-      // 3. Check if Booked
+      // 3. Check if Booked (DB) or Pending (Redis Lock)
       const isBooked = existingBookings.some((b) => b.startTime === startTime);
+      const isPending = lockedStartTimes.includes(startTime);
 
       slots.push({
         startTime,
         endTime,
         isBooked,
+        isPending,
         isPast,
         isClosed,
+        available: !isBooked && !isPending && !isPast && !isClosed,
         price: court.pricePerHour,
       });
     }
@@ -110,7 +138,13 @@ export class BookingService {
   }
 
   async createMultiBooking(dto: CreateBookingDto, userId: string) {
-    const { courtId, bookingDate, slots, startTime: dtStartTime } = dto;
+    const {
+      courtId,
+      bookingDate,
+      slots,
+      totalPrice,
+      startTime: dtStartTime,
+    } = dto;
 
     const court = await this.prisma.court.findUnique({
       where: { id: courtId },
@@ -137,11 +171,29 @@ export class BookingService {
       throw new BadRequestException('Vui lòng chọn khung giờ đặt sân');
     }
 
+    // 1. Redis Distributed Lock Check
+    for (const startTime of slotsToBook) {
+      const lockKey = `booking_lock:${courtId}:${bookingDate}:${startTime}`;
+      const isAcquired = await this.redisService.setnxWithExpire(
+        lockKey,
+        userId,
+        600, // 10 minutes TTL
+      );
+      if (!isAcquired) {
+        // Rollback any locks already acquired in this loop
+        await this.releaseLocks(courtId, bookingDate, slotsToBook);
+        throw new ConflictException(
+          `Khung giờ ${startTime} đang có người thực hiện giao dịch. Vui lòng thử lại sau 10 phút.`,
+        );
+      }
+    }
+
     const now = new Date();
     const [year, month, day] = bookingDate.split('-').map(Number);
     const VN_UTC_OFFSET_HOURS = 7;
 
-    const finalBookings = slotsToBook.map((startTime) => {
+    const finalBookings: Array<{ startTime: string; endTime: string }> = [];
+    for (const startTime of slotsToBook) {
       let bStart = parseInt(startTime.split(':')[0], 10);
       let bEnd = bStart + 1;
 
@@ -161,12 +213,15 @@ export class BookingService {
         0,
       );
       if (slotUtcMs <= now.getTime()) {
+        // Release locks on error
+        await this.releaseLocks(courtId, bookingDate, slotsToBook);
         throw new BadRequestException(
           `Khung giờ ${startTime} đã trôi qua. Vui lòng chọn khung giờ khác.`,
         );
       }
 
       if (bStart < cOpen || bEnd > cClose) {
+        await this.releaseLocks(courtId, bookingDate, slotsToBook);
         const realEndHour = (bStart + 1) % 24;
         const realEndTime = `${realEndHour.toString().padStart(2, '0')}:00`;
         throw new BadRequestException(
@@ -177,8 +232,8 @@ export class BookingService {
       const realEndHour = bEnd % 24;
       const formattedEndTime = `${realEndHour.toString().padStart(2, '0')}:00`;
 
-      return { startTime, endTime: formattedEndTime };
-    });
+      finalBookings.push({ startTime, endTime: formattedEndTime });
+    }
 
     const existing = await this.prisma.booking.findMany({
       where: {
@@ -190,6 +245,7 @@ export class BookingService {
     });
 
     if (existing.length > 0) {
+      await this.releaseLocks(courtId, bookingDate, slotsToBook);
       const bookedSlots = existing.map((b) => b.startTime).join(', ');
       throw new ConflictException(
         `Các khung giờ sau đã được đặt: ${bookedSlots}`,
@@ -197,33 +253,64 @@ export class BookingService {
     }
 
     const pricePerSlot = court.pricePerHour;
+    // totalPriceCalculated is used for verification logic if needed,
+    // for now we trust the frontend price or can add a check here.
+    const _totalPriceCalculated = pricePerSlot * slotsToBook.length;
+    if (Math.abs(_totalPriceCalculated - totalPrice) > 1) {
+      this.logger.warn(
+        `Price mismatch for user ${userId}: Frontend=${totalPrice}, Backend=${_totalPriceCalculated}`,
+      );
+    }
+    // 3. Generate Safe Order Code (Safe integer < 2^53 - 1)
+    const orderCode = Number(
+      `${Date.now()}${Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, '0')}`,
+    );
 
     try {
-      return await this.prisma.$transaction(
-        finalBookings.map((slot) => {
-          return this.prisma.booking.create({
-            data: {
-              courtId,
-              userId,
-              bookingDate,
-              startTime: slot.startTime,
-              endTime: slot.endTime,
-              totalPrice: pricePerSlot,
-              status: BookingStatus.PENDING,
-            },
-          });
-        }),
+      // 2. Store Temp Payload in Redis (10 minutes TTL)
+      const payload = {
+        userId,
+        courtId,
+        courtName: court.name,
+        bookingDate,
+        slots: finalBookings,
+        totalPrice,
+      };
+
+      await this.redisService.set(
+        `temp_order:${orderCode}`,
+        JSON.stringify(payload),
+        600, // 10 minutes
       );
+
+      // 5. Generate PayOS Payment Link
+      const description = `Thanh toan ${slotsToBook.length} ca san`.slice(
+        0,
+        25,
+      );
+      const paymentLink = await this.paymentService.generatePayosLink(
+        orderCode,
+        totalPrice,
+        description,
+      );
+
+      return {
+        orderCode,
+        checkoutUrl: paymentLink.checkoutUrl,
+      };
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException(
-          'One or more slots were just booked by someone else',
-        );
-      }
+      await this.releaseLocks(courtId, bookingDate, slotsToBook);
       throw error;
+    }
+  }
+
+  private async releaseLocks(courtId: string, date: string, slots: string[]) {
+    for (const startTime of slots) {
+      await this.redisService.del(
+        `booking_lock:${courtId}:${date}:${startTime}`,
+      );
     }
   }
 

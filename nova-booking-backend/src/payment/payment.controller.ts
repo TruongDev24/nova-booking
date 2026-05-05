@@ -1,18 +1,11 @@
-import { Controller, Post, Body, UseGuards, Req, Res } from '@nestjs/common';
+import { Controller, Post, Body, Req, Res } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import * as express from 'express';
 
 @Controller('payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
-
-  @UseGuards(JwtAuthGuard)
-  @Post('create-link')
-  async createLink(@Body('bookingId') bookingId: string) {
-    return this.paymentService.createPaymentLink(bookingId);
-  }
 
   @Public()
   @Post('webhook')

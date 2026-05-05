@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BullModule } from '@nestjs/bullmq';
+import { RedisModule } from './redis/redis.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -15,6 +17,18 @@ import { PaymentModule } from './payment/payment.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get('REDIS_HOST', 'localhost'),
+          port: config.get('REDIS_PORT', 6379),
+          password: config.get('REDIS_PASSWORD'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
+    RedisModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
