@@ -5,7 +5,7 @@ import { RedisService } from '../../src/redis/redis.service';
 import { PaymentService } from '../../src/payment/payment.service';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
-import { PrismaClient, BookingStatus, Court } from '@prisma/client';
+import { PrismaClient, Court } from '@prisma/client';
 
 describe('BookingService', () => {
   let service: BookingService;
@@ -72,7 +72,7 @@ describe('BookingService', () => {
       paymentService.generatePayosLink.mockResolvedValue({
         checkoutUrl: 'http://pay.os/link',
         orderCode: 12345,
-      } as any);
+      } as never);
 
       const dto = {
         courtId: mockCourtId,
@@ -84,16 +84,19 @@ describe('BookingService', () => {
       const result = await service.createMultiBooking(dto, mockUserId);
 
       expect(result).toHaveProperty('checkoutUrl', 'http://pay.os/link');
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(redisService.setnxWithExpire).toHaveBeenCalledWith(
         expect.stringContaining('booking_lock'),
         mockUserId,
         600,
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(redisService.set).toHaveBeenCalledWith(
         expect.stringContaining('temp_order'),
         expect.stringContaining(mockUserId),
         600,
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.booking.create).not.toHaveBeenCalled();
     });
 
@@ -108,7 +111,9 @@ describe('BookingService', () => {
         totalPrice: 100000,
       };
 
-      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(ConflictException);
+      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('3. Validation: Past Time Booking should fail and release locks', async () => {
@@ -122,7 +127,10 @@ describe('BookingService', () => {
         totalPrice: 100000,
       };
 
-      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(BadRequestException);
+      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(redisService.del).toHaveBeenCalled();
     });
 
@@ -137,7 +145,9 @@ describe('BookingService', () => {
         totalPrice: 100000,
       };
 
-      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(BadRequestException);
+      await expect(service.createMultiBooking(dto, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });
