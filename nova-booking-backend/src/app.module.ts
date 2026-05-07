@@ -12,6 +12,7 @@ import { BookingModule } from './booking/booking.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ReviewModule } from './review/review.module';
 import { PaymentModule } from './payment/payment.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { PaymentModule } from './payment/payment.module';
     AnalyticsModule,
     ReviewModule,
     PaymentModule,
+    NotificationModule,
   ],
   controllers: [],
   providers: [],

@@ -32,16 +32,28 @@ enum PaymentMethod {
   E_WALLET
 }
 
+enum RefundStatus {
+  NONE
+  PENDING
+  COMPLETED
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  fullName  String
-  phone     String
+  id               String    @id @default(uuid())
+  email            String    @unique
+  password         String
+  fullName         String
+  phone            String
   avatar           String?
   role             Role      @default(USER)
   resetToken       String?
   resetTokenExpiry DateTime?
+  
+  // Bank Information for Refunds
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountName   String?
+
   createdAt        DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -62,6 +74,8 @@ model Court {
   amenities    String[]
   images       String[]
   ownerId      String
+  avgRating    Float    @default(0)
+  reviewCount  Int      @default(0)
   isDeleted    Boolean  @default(false)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
@@ -72,17 +86,18 @@ model Court {
 }
 
 model Booking {
-  id            String        @id @default(uuid())
-  userId        String
-  courtId       String
-  bookingDate   String        // Định dạng YYYY-MM-DD
-  startTime     String        // Định dạng HH:mm
-  endTime       String        // Định dạng HH:mm
-  totalPrice    Float
-  status        BookingStatus @default(PENDING)
-  paymentStatus PaymentStatus @default(UNPAID)
-  cancelReason  String?
-  payosOrderCode BigInt? @db.BigInt
+  id             String        @id @default(uuid())
+  userId         String
+  courtId        String
+  bookingDate    String // Định dạng YYYY-MM-DD
+  startTime      String // Định dạng HH:mm
+  endTime        String // Định dạng HH:mm
+  totalPrice     Float
+  status         BookingStatus @default(PENDING)
+  paymentStatus  PaymentStatus @default(UNPAID)
+  refundStatus   RefundStatus  @default(NONE)
+  cancelReason   String?
+  payosOrderCode BigInt?       @db.BigInt
   expiresAt      DateTime?     @db.Timestamptz(3)
   createdAt      DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime      @updatedAt @db.Timestamptz(3)

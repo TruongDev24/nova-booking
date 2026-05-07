@@ -1,10 +1,12 @@
-import { Controller, Post, Body, Req, Res } from '@nestjs/common';
+import { Controller, Logger, Post, Req, Res } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { Public } from '../auth/decorators/public.decorator';
 import * as express from 'express';
 
 @Controller('payment')
 export class PaymentController {
+  private readonly logger = new Logger(PaymentController.name);
+
   constructor(private readonly paymentService: PaymentService) {}
 
   @Public()
@@ -14,21 +16,30 @@ export class PaymentController {
     @Res() res: express.Response,
   ) {
     const body = req.body as unknown;
+
     try {
-      // We still use the service for the heavy lifting, but we control the response here
+      // Fulfillment logic is encapsulated in the service
       await this.paymentService.handleWebhook(body);
-      return res.status(200).json({ success: true });
+
+      // Always return 200 OK to PayOS to stop retries
+      return res.status(200).json({
+        success: true,
+        message: 'Webhook processed successfully',
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
-        'PayOS Webhook Verification Note/Error (Expected during test ping):',
+
+      this.logger.error(
+        'Unexpected Error in PaymentController.handleWebhook:',
         errorMessage,
       );
+
       // CRITICAL: Always return 200 OK so PayOS dashboard accepts the URL setup
+      // and stops retrying failed/unauthorized webhooks.
       return res.status(200).json({
         success: true,
-        message: 'Webhook received (registration mode)',
+        message: 'Webhook received (error logged)',
       });
     }
   }

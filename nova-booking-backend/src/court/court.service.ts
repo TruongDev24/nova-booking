@@ -1,9 +1,9 @@
 import {
-  Injectable,
+  BadRequestException,
   ForbiddenException,
+  Injectable,
   NotFoundException,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +13,7 @@ import { Court, Prisma, Role } from '@prisma/client';
 import type { UserPayload } from '../common/interfaces/user-payload.interface';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { NotificationGateway } from '../notification/notification.gateway';
 
 @Injectable()
 export class CourtService {
@@ -20,10 +21,11 @@ export class CourtService {
     private prisma: PrismaService,
     private cloudinaryService: CloudinaryService,
     private mailerService: MailerService,
+    private notificationGateway: NotificationGateway,
   ) {}
 
   async create(dto: CreateCourtDto, ownerId: string): Promise<Court> {
-    return this.prisma.court.create({
+    const result = await this.prisma.court.create({
       data: {
         ...dto,
         openingTime: dto.openingTime || '05:00',
@@ -34,8 +36,21 @@ export class CourtService {
         ownerId,
       },
     });
+
+    // Trigger 4: Global - Court Added
+    this.notificationGateway.emitToRoom(
+      'room_global_courts',
+      'court_added',
+      result,
+    );
+
+    return result;
   }
 
+  /**
+   * Refactored findAll to utilize cached RCM fields (avgRating, reviewCount)
+   * This eliminates the N+1 aggregation performance issue.
+   */
   async findAll(
     user: UserPayload,
     query: PaginationQueryDto,
@@ -52,7 +67,6 @@ export class CourtService {
     const { search, sortBy, sortOrder } = query;
     const skip = (page - 1) * limit;
 
-    // Build WHERE clause safely
     const where: Prisma.CourtWhereInput = {};
 
     if (user.role === Role.ADMIN) {
@@ -61,7 +75,6 @@ export class CourtService {
       where.isDeleted = false;
     }
 
-    // Explicit search validation to prevent crashes
     if (typeof search === 'string' && search.trim() !== '') {
       const searchLower = search.trim();
       where.OR = [
@@ -78,35 +91,16 @@ export class CourtService {
     }
 
     try {
-      const [courts, total] = await Promise.all([
+      // One single query to fetch everything, no map/aggregate needed
+      const [data, total] = await Promise.all([
         this.prisma.court.findMany({
           where,
           skip,
           take: limit,
           orderBy,
-          include: {
-            _count: {
-              select: { reviews: true },
-            },
-          },
         }),
         this.prisma.court.count({ where }),
       ]);
-
-      // Fetch avg rating for each court (simplified for MVP)
-      const data = await Promise.all(
-        courts.map(async (court) => {
-          const aggregation = await this.prisma.review.aggregate({
-            where: { courtId: court.id },
-            _avg: { rating: true },
-          });
-          return {
-            ...court,
-            avgRating: aggregation._avg.rating || 0,
-            totalReviews: court._count.reviews,
-          };
-        }),
-      );
 
       return {
         data,
@@ -123,31 +117,19 @@ export class CourtService {
     }
   }
 
-  async findOne(
-    id: string,
-  ): Promise<Court & { avgRating: number; totalReviews: number }> {
+  /**
+   * Refactored findOne to use cached RCM fields.
+   */
+  async findOne(id: string): Promise<Court> {
     const court = await this.prisma.court.findUnique({
       where: { id },
-      include: {
-        _count: {
-          select: { reviews: true },
-        },
-      },
     });
+
     if (!court || court.isDeleted) {
-      throw new NotFoundException(`Court with ID ${id} not found`);
+      throw new NotFoundException(`Sân với ID ${id} không tồn tại`);
     }
 
-    const aggregation = await this.prisma.review.aggregate({
-      where: { courtId: id },
-      _avg: { rating: true },
-    });
-
-    return {
-      ...court,
-      avgRating: aggregation._avg.rating || 0,
-      totalReviews: court._count.reviews,
-    };
+    return court;
   }
 
   async update(
@@ -158,7 +140,7 @@ export class CourtService {
     const court = await this.findOne(id);
     if (court.ownerId !== ownerId) {
       throw new ForbiddenException(
-        'You do not have permission to update this court',
+        'Bạn không có quyền cập nhật thông tin sân này',
       );
     }
 
@@ -171,10 +153,23 @@ export class CourtService {
       await this.cloudinaryService.deleteFiles(court.images);
     }
 
-    return this.prisma.court.update({
+    const result = await this.prisma.court.update({
       where: { id },
       data: dto,
     });
+
+    // Trigger: Court Status Changed
+    this.notificationGateway.emitToRoom(
+      'room_global_courts',
+      'court_status_changed',
+      {
+        id: result.id,
+        isDeleted: result.isDeleted,
+        name: result.name,
+      },
+    );
+
+    return result;
   }
 
   async remove(id: string, ownerId: string): Promise<void> {
@@ -195,7 +190,6 @@ export class CourtService {
       );
     }
 
-    // --- Logic xử lý thời gian GMT+7 ---
     const now = new Date();
     const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
     const todayStr = vnTime.toISOString().split('T')[0];
@@ -203,7 +197,6 @@ export class CourtService {
     const currentMin = vnTime.getUTCMinutes().toString().padStart(2, '0');
     const currentTimeStr = `${currentHour}:${currentMin}`;
 
-    // Tìm các đơn đặt sân trong tương lai
     const futureBookings = await this.prisma.booking.findMany({
       where: {
         courtId: id,
@@ -221,14 +214,11 @@ export class CourtService {
       },
     });
 
-    // --- Thực thi Transaction ---
     await this.prisma.$transaction([
-      // 1. Ngừng hoạt động sân
       this.prisma.court.update({
         where: { id },
         data: { isDeleted: true },
       }),
-      // 2. Hủy các đơn đặt sân tương lai
       this.prisma.booking.updateMany({
         where: {
           id: { in: futureBookings.map((b) => b.id) },
@@ -240,7 +230,32 @@ export class CourtService {
       }),
     ]);
 
-    // --- Gửi Email thông báo (Resilient with Promise.allSettled) ---
+    // Trigger: Private Alerts for affected users
+    for (const booking of futureBookings) {
+      this.notificationGateway.emitToRoom(
+        `room_user_${booking.userId}`,
+        'booking_canceled',
+        {
+          id: booking.id,
+          courtName: court.name,
+          bookingDate: booking.bookingDate,
+          startTime: booking.startTime,
+          reason: `Sân ${court.name} ngừng hoạt động.`,
+        },
+      );
+    }
+
+    // Trigger: Global Status Update
+    this.notificationGateway.emitToRoom(
+      'room_global_courts',
+      'court_status_changed',
+      {
+        id: court.id,
+        isDeleted: true,
+        name: court.name,
+      },
+    );
+
     if (futureBookings.length > 0) {
       const emailPromises = futureBookings.map((booking) => {
         return this.mailerService.sendMail({
@@ -261,7 +276,6 @@ export class CourtService {
         });
       });
 
-      // Thực thi gửi mail song song, không làm fail transaction nếu 1 mail lỗi
       void Promise.allSettled(emailPromises).then((results) => {
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
@@ -288,9 +302,22 @@ export class CourtService {
       throw new ForbiddenException('Bạn không có quyền kích hoạt lại sân này');
     }
 
-    return this.prisma.court.update({
+    const result = await this.prisma.court.update({
       where: { id },
       data: { isDeleted: false },
     });
+
+    // Trigger: Global Status Update
+    this.notificationGateway.emitToRoom(
+      'room_global_courts',
+      'court_status_changed',
+      {
+        id: result.id,
+        isDeleted: false,
+        name: result.name,
+      },
+    );
+
+    return result;
   }
 }

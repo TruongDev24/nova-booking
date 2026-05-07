@@ -4,7 +4,7 @@ import { CourtController } from '../../src/court/court.controller';
 import { CourtService } from '../../src/court/court.service';
 import { CloudinaryService } from '../../src/cloudinary/cloudinary.service';
 import { Role } from '@prisma/client';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UserPayload } from '../../src/common/interfaces/user-payload.interface';
 import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
@@ -35,7 +35,7 @@ describe('CourtController', () => {
     ownerId: 'user-id',
     isDeleted: false,
     avgRating: 0,
-    totalReviews: 0,
+    reviewCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

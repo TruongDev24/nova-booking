@@ -1,0 +1,18 @@
+import apiClient from "./apiClient";
+
+export interface BankInfo {
+    bankName: string;
+    bankAccountNumber: string;
+    bankAccountName: string;
+}
+
+export const userService = {
+    updateBankInfo: async (data: BankInfo) => {
+        const response = await apiClient.patch("/users/profile/bank", data);
+        return response.data;
+    },
+    getProfile: async () => {
+        const response = await apiClient.get("/auth/me");
+        return response.data;
+    }
+};

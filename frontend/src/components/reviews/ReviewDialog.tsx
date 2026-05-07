@@ -76,7 +76,7 @@ export function ReviewDialog({bookingId, courtName, onSuccess, children}: Review
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger render={
                 children ? (children as React.ReactElement) : <Button variant="outline" size="sm">Đánh giá</Button>
-            } />
+            }/>
             <DialogContent className="sm:max-width-[425px]">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold">Đánh giá trải nghiệm</DialogTitle>
@@ -90,7 +90,7 @@ export function ReviewDialog({bookingId, courtName, onSuccess, children}: Review
                         <FormField
                             control={form.control}
                             name="rating"
-                            render={({ field }: { field: ControllerRenderProps<FormValues, "rating"> }) => (
+                            render={({field}: { field: ControllerRenderProps<FormValues, "rating"> }) => (
                                 <FormItem className="flex flex-col items-center gap-2">
                                     <FormLabel className="text-base">Mức độ hài lòng</FormLabel>
                                     <FormControl>
@@ -121,7 +121,7 @@ export function ReviewDialog({bookingId, courtName, onSuccess, children}: Review
                         <FormField
                             control={form.control}
                             name="comment"
-                            render={({ field }: { field: ControllerRenderProps<FormValues, "comment"> }) => (
+                            render={({field}: { field: ControllerRenderProps<FormValues, "comment"> }) => (
                                 <FormItem>
                                     <FormLabel>Nhận xét chi tiết</FormLabel>
                                     <FormControl>

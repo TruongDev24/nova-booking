@@ -1,8 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PayOS } from '@payos/node';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { NotificationGateway } from '../notification/notification.gateway';
 
 interface TempOrderPayload {
   userId: string;
@@ -19,11 +20,13 @@ interface TempOrderPayload {
 @Injectable()
 export class PaymentService {
   private payos: PayOS;
+  private readonly logger = new Logger(PaymentService.name);
 
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
     private redisService: RedisService,
+    private notificationGateway: NotificationGateway,
   ) {
     this.payos = new PayOS({
       clientId: this.configService.get<string>('PAYOS_CLIENT_ID'),
@@ -52,61 +55,96 @@ export class PaymentService {
       const paymentLinkResponse = await this.payos.paymentRequests.create(body);
       return paymentLinkResponse;
     } catch (error) {
-      console.error('PayOS Create Error:', error);
+      this.logger.error('PayOS Create Error:', error);
       throw new BadRequestException('Could not create payment link');
     }
   }
 
+  /**
+   * Refactored Webhook Handler (Phase 3)
+   * Implements strict idempotency, amount verification, and atomic fulfillment.
+   */
   async handleWebhook(body: unknown) {
-    console.log('--- PAYOS WEBHOOK RECEIVED ---');
-    console.log('Raw Body:', JSON.stringify(body, null, 2));
+    this.logger.log('--- PAYOS WEBHOOK RECEIVED ---');
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const verifiedData = await this.payos.webhooks.verify(body as any);
-      console.log(
-        'Verification Success:',
-        JSON.stringify(verifiedData, null, 2),
+      // 1. PayOS Signature Verification (Strict)
+      const verifiedData = (await this.payos.webhooks.verify(body as any)) as {
+        orderCode: number;
+        amount: number;
+        description: string;
+        paymentLinkId: string;
+      };
+      const orderCode = verifiedData.orderCode;
+
+      // Skip processing for test transactions if necessary, but log them
+      if (verifiedData.description === 'ma giao dich thu nghiem') {
+        this.logger.log(
+          `Test transaction received for orderCode: ${orderCode}`,
+        );
+        return { success: true };
+      }
+
+      // 2. Webhook Idempotency Lock (Redis)
+      // Prevents race conditions if PayOS sends multiple webhooks rapidly
+      const processingLockKey = `webhook_processing:${orderCode}`;
+      const isLockAcquired = await this.redisService.setnxWithExpire(
+        processingLockKey,
+        'processing',
+        30, // 30 seconds TTL
       );
 
-      if (verifiedData.code === '00') {
-        const orderCode = verifiedData.orderCode;
-        console.log('Processing OrderCode:', orderCode);
+      if (!isLockAcquired) {
+        this.logger.warn(
+          `Webhook for orderCode ${orderCode} is already being processed by another instance.`,
+        );
+        return { success: true };
+      }
 
-        // 1. Idempotency Check
+      try {
+        // 3. Database Idempotency Check
         const existingBooking = await this.prisma.booking.findFirst({
           where: { payosOrderCode: BigInt(orderCode) },
         });
+
         if (existingBooking) {
-          console.log('Booking already exists for orderCode:', orderCode);
+          this.logger.log(
+            `Order ${orderCode} already fulfilled in database. Skipping.`,
+          );
           return { success: true };
         }
 
-        // 2. Get Payload from Redis
+        // 4. Retrieve Temp Order Payload from Redis
         const payloadKey = `temp_order:${orderCode}`;
         const payloadStr = await this.redisService.get(payloadKey);
 
         if (!payloadStr) {
-          console.error(
-            `CRITICAL: Payload not found in Redis for orderCode: ${orderCode}`,
+          this.logger.warn(
+            `Fulfillment failed: Payload for order ${orderCode} not found (expired or already processed).`,
           );
           return { success: true };
         }
 
         const payload = JSON.parse(payloadStr) as TempOrderPayload;
         const { userId, courtId, bookingDate, slots, totalPrice } = payload;
-        console.log(
-          'Retrieved Redis Payload:',
-          JSON.stringify(payload, null, 2),
-        );
 
-        // 3. Insert into PostgreSQL (Prisma Transaction)
-        console.log('Starting Prisma Transaction...');
+        // 5. CRITICAL: Amount Verification (Security Check)
+        if (verifiedData.amount !== totalPrice) {
+          this.logger.error(
+            `SECURITY ALERT: Payment amount mismatch for order ${orderCode}. Expected: ${totalPrice}, Actual Paid: ${verifiedData.amount}`,
+          );
+          // Return 200 OK to stop PayOS retries, but do NOT fulfill the order
+          return { success: true };
+        }
+
+        // 6. Prisma Transaction (Atomic Fulfillment)
+        this.logger.log(
+          `Starting atomic fulfillment for order ${orderCode}...`,
+        );
         await this.prisma.$transaction(async (tx) => {
           const pricePerSlot = totalPrice / slots.length;
 
           for (const slot of slots) {
-            console.log(`Creating booking for slot: ${slot.startTime}`);
             const booking = await tx.booking.create({
               data: {
                 courtId,
@@ -121,7 +159,6 @@ export class PaymentService {
               },
             });
 
-            console.log(`Creating payment record for booking: ${booking.id}`);
             await tx.payment.create({
               data: {
                 bookingId: booking.id,
@@ -134,23 +171,59 @@ export class PaymentService {
             });
           }
         });
-        console.log('Prisma Transaction Committed Successfully.');
+        this.logger.log(`Order ${orderCode} fulfilled successfully.`);
 
-        // 4. Cleanup Redis (Payload and Locks)
-        console.log('Cleaning up Redis keys...');
-        await this.redisService.del(payloadKey);
+        // 7. Strict Cleanup (Post-Commit Only)
+        this.logger.log(`Cleaning up Redis state for order ${orderCode}...`);
+
+        // Remove individual slot locks
         for (const slot of slots) {
-          const lockKey = `booking_lock:${courtId}:${bookingDate}:${slot.startTime}`;
-          await this.redisService.del(lockKey);
-          console.log(`Deleted lock: ${lockKey}`);
+          const slotLockKey = `booking_lock:${courtId}:${bookingDate}:${slot.startTime}`;
+          await this.redisService.del(slotLockKey);
         }
-        console.log('Webhook Fulfillment Complete.');
-      } else {
-        console.log('Payment status is not successful:', verifiedData.code);
+
+        // Remove temp order payload
+        await this.redisService.del(payloadKey);
+
+        // Remove from user's pending limit set
+        const userPendingKey = `user_pending_orders:${userId}`;
+        await this.redisService.srem(userPendingKey, orderCode.toString());
+
+        // 8. TRIGGER: Real-time Notification to Owner
+        try {
+          const court = await this.prisma.court.findUnique({
+            where: { id: courtId },
+            select: { ownerId: true, name: true },
+          });
+
+          if (court) {
+            const user = await this.prisma.user.findUnique({
+              where: { id: userId },
+              select: { fullName: true },
+            });
+
+            this.notificationGateway.notifyOwner(court.ownerId, 'new_booking', {
+              orderCode,
+              courtName: court.name,
+              customerName: user?.fullName || 'Khách hàng',
+              totalPrice,
+              bookingDate,
+              slots: slots.map((s) => s.startTime),
+            });
+          }
+        } catch (error) {
+          this.logger.error(
+            'Failed to send real-time notification to owner:',
+            error,
+          );
+        }
+      } finally {
+        // 8. Final Cleanup: Release processing lock
+        await this.redisService.del(processingLockKey);
       }
     } catch (error) {
-      console.error('PAYOS WEBHOOK ERROR:', error);
-      throw error; // Rethrow so the controller catches it
+      this.logger.error(`PAYOS WEBHOOK ERROR for order:`, error);
+      // We don't rethrow because we want the controller to return 200 OK to PayOS
     }
 
     return { success: true };

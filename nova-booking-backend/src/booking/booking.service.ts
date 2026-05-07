@@ -1,10 +1,12 @@
 import {
-  Injectable,
-  ConflictException,
-  NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
+  HttpException,
+  Injectable,
   Logger,
+  NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -12,6 +14,7 @@ import { BookingStatus, Prisma } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { RedisService } from '../redis/redis.service';
 import { PaymentService } from '../payment/payment.service';
+import { NotificationGateway } from '../notification/notification.gateway';
 
 @Injectable()
 export class BookingService {
@@ -21,6 +24,7 @@ export class BookingService {
     private prisma: PrismaService,
     private redisService: RedisService,
     private paymentService: PaymentService,
+    private notificationGateway: NotificationGateway,
   ) {}
 
   async getDailySlots(courtId: string, date: string) {
@@ -73,9 +77,6 @@ export class BookingService {
     }> = [];
 
     const now = new Date();
-    console.log('--- DEBUG TIME ---');
-    console.log('Raw Server Time (now):', now.toISOString());
-    console.log('Server Timezone Offset:', now.getTimezoneOffset());
 
     // ALWAYS generate 24 slots (00:00 to 23:00)
     for (let h = 0; h < 24; h++) {
@@ -86,18 +87,14 @@ export class BookingService {
       let isClosed = false;
       if (!is24Hours) {
         if (openHour < closeHour) {
-          // Normal day (e.g., 05:00 to 22:00)
           if (h < openHour || h >= closeHour) isClosed = true;
         } else {
-          // Cross-day (e.g., 23:00 to 22:00)
           if (h >= closeHour && h < openHour) isClosed = true;
         }
       }
 
       // 2. Check if Past Time (Real-time comparison)
       const [year, month, day] = date.split('-').map(Number);
-      // `date` and slot hours are interpreted as Asia/Ho_Chi_Minh (UTC+7).
-      // Convert slot time to UTC millis for a timezone-stable comparison (Docker often runs UTC).
       const VN_UTC_OFFSET_HOURS = 7;
       const slotUtcMs = Date.UTC(
         year,
@@ -108,15 +105,7 @@ export class BookingService {
         0,
         0,
       );
-      const slotDateTime = new Date(slotUtcMs);
-      // If it's exactly at slot start time, slot should be considered past/closed.
       const isPast = slotUtcMs <= now.getTime();
-
-      if (h < 3) {
-        console.log(
-          `Slot: ${startTime}, SlotDateTime: ${slotDateTime.toISOString()}, isPast: ${isPast}`,
-        );
-      }
 
       // 3. Check if Booked (DB) or Pending (Redis Lock)
       const isBooked = existingBookings.some((b) => b.startTime === startTime);
@@ -138,161 +127,191 @@ export class BookingService {
   }
 
   async createMultiBooking(dto: CreateBookingDto, userId: string) {
-    const {
-      courtId,
-      bookingDate,
-      slots,
-      totalPrice,
-      startTime: dtStartTime,
-    } = dto;
+    const { courtId, bookingDate, slots } = dto;
 
+    // 1. Anti-Spam / Slot Hostage Prevention (Execute First)
+    const pendingOrdersKey = `user_pending_orders:${userId}`;
+    let pendingCount = 0;
+    try {
+      pendingCount = await this.redisService.scard(pendingOrdersKey);
+    } catch (error) {
+      this.logger.error(`Redis scard failure: ${error.message}`);
+      throw new ServiceUnavailableException('Hệ thống giữ chỗ đang bận, vui lòng thử lại sau');
+    }
+
+    if (pendingCount >= 3) {
+      throw new BadRequestException(
+        'Bạn đã đạt giới hạn đơn hàng đang chờ thanh toán. Vui lòng thanh toán hoặc đợi các đơn hàng cũ hết hạn.',
+      );
+    }
+
+    // 2. Database Validation (Before Locking)
     const court = await this.prisma.court.findUnique({
       where: { id: courtId },
     });
-    if (!court) {
-      throw new NotFoundException('Court not found');
+    if (!court || court.isDeleted) {
+      throw new NotFoundException(
+        'Sân không tồn tại hoặc đã bị ngừng hoạt động.',
+      );
     }
 
+    // 3. Time & Business Rules Validation
     const courtOpen = court.openingTime || '05:00';
     const courtClose = court.closingTime || '22:00';
-
     const cOpen = parseInt(courtOpen.split(':')[0], 10);
     let cClose = parseInt(courtClose.split(':')[0], 10);
     if (cClose <= cOpen) cClose += 24;
-
-    const slotsToBook: string[] = [];
-    if (slots && slots.length > 0) {
-      slotsToBook.push(...slots);
-    } else if (dtStartTime) {
-      slotsToBook.push(dtStartTime);
-    }
-
-    if (slotsToBook.length === 0) {
-      throw new BadRequestException('Vui lòng chọn khung giờ đặt sân');
-    }
-
-    // 1. Redis Distributed Lock Check
-    for (const startTime of slotsToBook) {
-      const lockKey = `booking_lock:${courtId}:${bookingDate}:${startTime}`;
-      const isAcquired = await this.redisService.setnxWithExpire(
-        lockKey,
-        userId,
-        600, // 10 minutes TTL
-      );
-      if (!isAcquired) {
-        // Rollback any locks already acquired in this loop
-        await this.releaseLocks(courtId, bookingDate, slotsToBook);
-        throw new ConflictException(
-          `Khung giờ ${startTime} đang có người thực hiện giao dịch. Vui lòng thử lại sau 10 phút.`,
-        );
-      }
-    }
 
     const now = new Date();
     const [year, month, day] = bookingDate.split('-').map(Number);
     const VN_UTC_OFFSET_HOURS = 7;
 
-    const finalBookings: Array<{ startTime: string; endTime: string }> = [];
-    for (const startTime of slotsToBook) {
-      let bStart = parseInt(startTime.split(':')[0], 10);
-      let bEnd = bStart + 1;
+    const normalizedSlots: Array<{ startTime: string; endTime: string }> = [];
 
-      if (bStart < cOpen && cClose > 24) {
-        bStart += 24;
-        bEnd += 24;
+    for (const slotStartTime of slots) {
+      const bStart = parseInt(slotStartTime.split(':')[0], 10);
+
+      // Validation: Within operating hours
+      let checkStart = bStart;
+      if (checkStart < cOpen && cClose > 24) checkStart += 24;
+      if (checkStart < cOpen || checkStart + 1 > cClose) {
+        throw new BadRequestException(
+          `Khung giờ ${slotStartTime} nằm ngoài giờ hoạt động của sân (${courtOpen} - ${court.closingTime}).`,
+        );
       }
 
-      // Check if Past Time (Real-time comparison)
+      // Validation: Future time check (Asia/Ho_Chi_Minh)
       const slotUtcMs = Date.UTC(
         year,
         month - 1,
         day,
-        (bStart % 24) - VN_UTC_OFFSET_HOURS,
+        bStart - VN_UTC_OFFSET_HOURS,
         0,
         0,
         0,
       );
       if (slotUtcMs <= now.getTime()) {
-        // Release locks on error
-        await this.releaseLocks(courtId, bookingDate, slotsToBook);
         throw new BadRequestException(
-          `Khung giờ ${startTime} đã trôi qua. Vui lòng chọn khung giờ khác.`,
+          `Khung giờ ${slotStartTime} đã trôi qua. Vui lòng chọn khung giờ khác.`,
         );
       }
 
-      if (bStart < cOpen || bEnd > cClose) {
-        await this.releaseLocks(courtId, bookingDate, slotsToBook);
-        const realEndHour = (bStart + 1) % 24;
-        const realEndTime = `${realEndHour.toString().padStart(2, '0')}:00`;
-        throw new BadRequestException(
-          `Khung giờ ${startTime}-${realEndTime} nằm ngoài giờ hoạt động (${courtOpen}-${court.closingTime})`,
-        );
-      }
-
-      const realEndHour = bEnd % 24;
-      const formattedEndTime = `${realEndHour.toString().padStart(2, '0')}:00`;
-
-      finalBookings.push({ startTime, endTime: formattedEndTime });
+      const formattedEndTime = `${((bStart + 1) % 24)
+        .toString()
+        .padStart(2, '0')}:00`;
+      normalizedSlots.push({
+        startTime: slotStartTime,
+        endTime: formattedEndTime,
+      });
     }
 
+    // 4. Secure Price Recalculation (The "1-Cent Hack" Fix)
+    const calculatedTotalPrice = slots.length * court.pricePerHour;
+
+    // 5. Robust Redis Locking (All or Nothing)
+    const acquiredLocks: string[] = [];
+    for (const slotStartTime of slots) {
+      const lockKey = `booking_lock:${courtId}:${bookingDate}:${slotStartTime}`;
+      let isAcquired = false;
+      try {
+        isAcquired = await this.redisService.setnxWithExpire(
+          lockKey,
+          userId,
+          600, // 10 minutes TTL
+        );
+      } catch (error) {
+        this.logger.error(`Redis locking failure: ${error.message}`);
+        throw new ServiceUnavailableException(
+          'Hệ thống giữ chỗ đang bận, vui lòng thử lại sau',
+        );
+      }
+
+      if (!isAcquired) {
+        // CRITICAL: Release all acquired locks if any single one fails
+        for (const key of acquiredLocks) {
+          try {
+            await this.redisService.del(key);
+          } catch (e) {
+            // Silent catch on cleanup
+          }
+        }
+
+        // Trigger 3: Inventory Sync - Slots Released (Partial Rollback)
+        if (acquiredLocks.length > 0) {
+          const releasedSlots = acquiredLocks.map((l) => l.split(':').pop());
+          this.notificationGateway.emitToRoom(
+            `room_court_${courtId}`,
+            'slots_released',
+            {
+              bookingDate,
+              slots: releasedSlots,
+            },
+          );
+        }
+
+        throw new ConflictException(
+          'Sân đã có người đặt hoặc đang trong quá trình thanh toán. Vui lòng thử lại sau.',
+        );
+      }
+      acquiredLocks.push(lockKey);
+    }
+
+    // Trigger 2: Inventory Sync - Slots Locked
+    this.notificationGateway.emitToRoom(
+      `room_court_${courtId}`,
+      'slots_locked',
+      {
+        bookingDate,
+        slots: slots,
+      },
+    );
+
+    // Double check DB for existing bookings after locking
     const existing = await this.prisma.booking.findMany({
       where: {
         courtId,
         bookingDate,
-        startTime: { in: finalBookings.map((b) => b.startTime) },
+        startTime: { in: slots },
         status: { not: BookingStatus.CANCELLED },
       },
     });
 
     if (existing.length > 0) {
-      await this.releaseLocks(courtId, bookingDate, slotsToBook);
+      for (const key of acquiredLocks) await this.redisService.del(key);
       const bookedSlots = existing.map((b) => b.startTime).join(', ');
       throw new ConflictException(
         `Các khung giờ sau đã được đặt: ${bookedSlots}`,
       );
     }
 
-    const pricePerSlot = court.pricePerHour;
-    // totalPriceCalculated is used for verification logic if needed,
-    // for now we trust the frontend price or can add a check here.
-    const _totalPriceCalculated = pricePerSlot * slotsToBook.length;
-    if (Math.abs(_totalPriceCalculated - totalPrice) > 1) {
-      this.logger.warn(
-        `Price mismatch for user ${userId}: Frontend=${totalPrice}, Backend=${_totalPriceCalculated}`,
-      );
-    }
-    // 3. Generate Safe Order Code (Safe integer < 2^53 - 1)
-    const orderCode = Number(
-      `${Date.now()}${Math.floor(Math.random() * 1000)
-        .toString()
-        .padStart(3, '0')}`,
-    );
+    // 6. Save Temp Order & Register User Lock
+    const orderCode = Math.floor(Math.random() * 9007199254740991);
 
     try {
-      // 2. Store Temp Payload in Redis (10 minutes TTL)
       const payload = {
         userId,
         courtId,
         courtName: court.name,
         bookingDate,
-        slots: finalBookings,
-        totalPrice,
+        slots: normalizedSlots,
+        totalPrice: calculatedTotalPrice,
       };
 
       await this.redisService.set(
         `temp_order:${orderCode}`,
         JSON.stringify(payload),
-        600, // 10 minutes
+        600, // 10 minutes TTL
       );
 
-      // 5. Generate PayOS Payment Link
-      const description = `Thanh toan ${slotsToBook.length} ca san`.slice(
-        0,
-        25,
-      );
+      // Add to user's pending set
+      await this.redisService.sadd(pendingOrdersKey, orderCode.toString());
+      await this.redisService.expire(pendingOrdersKey, 600);
+
+      // 7. PayOS Link Generation
+      const description = `Thanh toan ${slots.length} ca san`.slice(0, 25);
       const paymentLink = await this.paymentService.generatePayosLink(
         orderCode,
-        totalPrice,
+        calculatedTotalPrice,
         description,
       );
 
@@ -301,16 +320,11 @@ export class BookingService {
         checkoutUrl: paymentLink.checkoutUrl,
       };
     } catch (error) {
-      await this.releaseLocks(courtId, bookingDate, slotsToBook);
+      // Cleanup on failure
+      for (const key of acquiredLocks) await this.redisService.del(key);
+      await this.redisService.srem(pendingOrdersKey, orderCode.toString());
+      this.logger.error(`Booking creation failed for user ${userId}:`, error);
       throw error;
-    }
-  }
-
-  private async releaseLocks(courtId: string, date: string, slots: string[]) {
-    for (const startTime of slots) {
-      await this.redisService.del(
-        `booking_lock:${courtId}:${date}:${startTime}`,
-      );
     }
   }
 
@@ -330,6 +344,7 @@ export class BookingService {
   async cancelBooking(id: string, userId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
+      include: { court: true },
     });
 
     if (!booking) {
@@ -338,6 +353,13 @@ export class BookingService {
 
     if (booking.userId !== userId) {
       throw new ForbiddenException('Bạn không có quyền hủy lịch này');
+    }
+
+    // Only PAID bookings can be cancelled by user
+    if (booking.paymentStatus !== 'PAID') {
+      throw new BadRequestException(
+        'Chỉ có thể hủy những lịch đã thanh toán thành công.',
+      );
     }
 
     if (booking.status === BookingStatus.CANCELLED) {
@@ -362,14 +384,42 @@ export class BookingService {
     const hoursDiff = (playTimeMs - Date.now()) / (1000 * 60 * 60);
     if (hoursDiff < 12) {
       throw new BadRequestException(
-        'Cannot cancel within 12 hours of playtime',
+        'Không thể hủy lịch trong vòng 12 giờ trước giờ bắt đầu chơi.',
       );
     }
 
-    return this.prisma.booking.update({
+    const updatedBooking = await this.prisma.booking.update({
       where: { id },
-      data: { status: BookingStatus.CANCELLED },
+      data: {
+        status: BookingStatus.CANCELLED,
+        refundStatus: 'PENDING', // Initialize refund workflow
+      },
     });
+
+    // --- REAL-TIME EMISSIONS ---
+    this.notificationGateway.emitToRoom(
+      `room_court_${booking.courtId}`,
+      'slots_released',
+      {
+        bookingDate: booking.bookingDate,
+        slots: [booking.startTime],
+      },
+    );
+
+    this.notificationGateway.notifyOwner(
+      booking.court.ownerId,
+      'booking_canceled',
+      {
+        id: booking.id,
+        courtName: booking.court.name,
+        bookingDate: booking.bookingDate,
+        startTime: booking.startTime,
+        reason: 'Khách hàng chủ động hủy lịch.',
+        canceledBy: 'CUSTOMER',
+      },
+    );
+
+    return updatedBooking;
   }
 
   // --- Admin Methods with Isolation ---
@@ -512,6 +562,46 @@ export class BookingService {
     return this.prisma.booking.update({
       where: { id },
       data: { status: BookingStatus.CANCELLED },
+    });
+  }
+
+  async markAsRefunded(id: string, adminId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        court: true,
+        user: {
+          select: {
+            bankName: true,
+            bankAccountNumber: true,
+            bankAccountName: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Không tìm thấy đơn đặt sân');
+    }
+
+    // Ownership check: Admin or Court Owner
+    if (booking.court.ownerId !== adminId) {
+      throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này');
+    }
+
+    if (booking.status !== BookingStatus.CANCELLED) {
+      throw new BadRequestException(
+        'Chỉ có thể hoàn tiền cho những đơn đã bị hủy',
+      );
+    }
+
+    if (booking.refundStatus !== 'PENDING') {
+      throw new BadRequestException('Đơn này không ở trạng thái chờ hoàn tiền');
+    }
+
+    return this.prisma.booking.update({
+      where: { id },
+      data: { refundStatus: 'COMPLETED' },
     });
   }
 }

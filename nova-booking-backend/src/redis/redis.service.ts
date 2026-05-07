@@ -56,6 +56,22 @@ export class RedisService implements OnModuleDestroy {
     return this.redis.keys(pattern);
   }
 
+  async sadd(key: string, value: string): Promise<void> {
+    await this.redis.sadd(key, value);
+  }
+
+  async scard(key: string): Promise<number> {
+    return this.redis.scard(key);
+  }
+
+  async expire(key: string, seconds: number): Promise<void> {
+    await this.redis.expire(key, seconds);
+  }
+
+  async srem(key: string, value: string): Promise<void> {
+    await this.redis.srem(key, value);
+  }
+
   onModuleDestroy() {
     this.redis.disconnect();
   }

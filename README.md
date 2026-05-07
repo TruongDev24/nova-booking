@@ -1,154 +1,465 @@
-# 🏸 Nova Booking - Court Management System
+# NOVA Booking
 
-[![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/TruongDev24/nova-booking/ci.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/TruongDev24/nova-booking/actions)
-[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+> **Premium Sports Court Management System** for real-time court reservations, secure checkout, automated payment fulfillment, and smart refund operations.
 
-**Nova Booking** is a high-performance, full-stack platform designed to revolutionize how sports facilities manage their operations and how players book their favorite courts. Featuring a data-driven dashboard for owners and a seamless, real-time booking experience for customers, it ensures maximum efficiency and user satisfaction.
+NOVA Booking is a production-ready full-stack platform built for sports court owners and players. It combines real-time availability synchronization, Redis-based anti-double-booking locks, PayOS payment automation, and an admin-first operations dashboard.
 
-
----
-
-## 🌟 Key Features
-
-### 👑 Admin / Owner Dashboard
-*   **Advanced Analytics**: Real-time visualization of Revenue trends, Occupancy Rates, and Cancellation metrics.
-*   **Peak Hours Heatmap**: Identify "Golden Hours" through dynamic bar charts to optimize court availability.
-*   **VIP Customer Tracking**: Automated identification of high-value customers based on spending and booking volume.
-*   **Court & Slot Control**: Full CRUD management for courts, amenities, and image galleries with a robust 24-hour slot generation system.
-
-### 👤 Customer Experience
-*   **Real-time Booking**: Interactive 24-hour time-slot grid with instant availability status (Booked, Past, Closed).
-*   **Timezone-Aware Validation**: Strict backend enforcement of the **Asia/Ho_Chi_Minh** (UTC+7) timezone for all scheduling logic.
-*   **Smart Conflict Prevention**: Atomic database transactions to ensure zero double-bookings or overlapping schedules.
-*   **Booking History**: Personalized dashboard to track upcoming games and past performance.
+![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-TypeScript-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-App%20Router-000000?style=for-the-badge&logo=next.js&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Prisma-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Locking%20%26%20Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 
 ---
 
-## 💻 Tech Stack
+## Table of Contents
 
-### 🎨 Frontend
-*   ![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB) **React 19**
-*   ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=nextdotjs&logoColor=white) **Next.js 15 (App Router)**
-*   ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white) **Tailwind CSS**
-*   ![Recharts](https://img.shields.io/badge/Recharts-22b5bf?style=flat-square) **Recharts** (SVG Charts)
-
-### ⚙️ Backend
-*   ![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat-square&logo=nestjs&logoColor=white) **NestJS**
-*   ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) **Prisma ORM**
-*   ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) **Passport & JWT Authentication**
-*   ![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=flat-square&logo=cloudinary&logoColor=white) **Cloudinary SDK** (Media Storage)
-
-### 🗄️ Database
-*   ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white) **PostgreSQL**
-
-### 🛠️ DevOps & QA
-*   ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) **Docker Compose**
-*   ![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) **Jest** (Unit Testing)
-*   ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white) **CI/CD Pipeline**
-
+- [1. Key Features](#1-key-features)
+- [2. Tech Stack](#2-tech-stack)
+- [3. Architecture Overview](#3-architecture-overview)
+- [4. System Workflow](#4-system-workflow)
+- [5. Project Structure](#5-project-structure)
+- [6. Getting Started](#6-getting-started)
+- [7. Environment Variables](#7-environment-variables)
+- [8. API Documentation](#8-api-documentation)
+- [9. Contributors](#9-contributors)
+- [10. License](#10-license)
 
 ---
 
-## 🚀 Getting Started (Local Development)
+## 1. Key Features
+
+- **Real-time Court Availability**
+  - Socket.io keeps all active clients synchronized.
+  - When a slot is locked, booked, released, or canceled, connected users immediately receive live updates.
+
+- **Anti-Double Booking with Redis Locks**
+  - Redis-powered 10-minute temporary slot lock during checkout.
+  - Prevents multiple users from paying for the same court slot.
+  - Uses all-or-nothing locking to avoid partial slot reservation.
+
+- **Automated PayOS Payment Flow**
+  - Secure PayOS checkout link generation.
+  - Webhook verification for payment fulfillment.
+  - Prisma `$transaction` ensures booking and payment records are created atomically.
+
+- **Smart Cancellation & Refund Workflow**
+  - Enforces a strict 12-hour cancellation rule.
+  - Paid cancellations move into a refund-pending workflow.
+  - Admin dashboard supports manual refund confirmation.
+
+- **VietQR Refund Support**
+  - Users can store refund bank details.
+  - Admins can process refunds using bank information and VietQR-ready data.
+  - Designed for fast, traceable manual refund operations.
+
+- **Court Management Dashboard**
+  - Court CRUD with images, amenities, pricing, opening hours, and soft delete/reactivation.
+  - Future bookings are automatically canceled when a court is deactivated.
+
+- **Review & Rating System**
+  - Users can review only completed bookings.
+  - Prevents duplicate reviews.
+  - Maintains cached court rating fields for fast display.
+
+- **Admin Analytics**
+  - Revenue, occupancy rate, cancellation rate, peak hours, court performance, and VIP customers.
+
+- **Production-Oriented Security**
+  - JWT authentication.
+  - Role-based authorization.
+  - Strict DTO validation.
+  - Server-side price calculation.
+  - Redis anti-spam pending-order limits.
+
+---
+
+## 2. Tech Stack
+
+### Frontend
+
+- **Next.js App Router**
+- **React**
+- **TanStack React Query**
+- **Tailwind CSS**
+- **Socket.io Client**
+- **Axios**
+- **shadcn-style UI components**
+
+### Backend
+
+- **NestJS**
+- **TypeScript**
+- **Prisma ORM**
+- **PostgreSQL**
+- **Redis**
+- **Socket.io WebSockets**
+- **Swagger / OpenAPI**
+- **JWT Authentication**
+- **PayOS Payment Integration**
+- **Cloudinary Image Upload**
+
+### Infrastructure
+
+- **Docker Compose**
+- **PostgreSQL**
+- **Redis**
+- **Prisma Migrations**
+- **Ngrok for local webhook testing**
+
+---
+
+## 3. Architecture Overview
+
+NOVA Booking is designed around a clear separation of responsibilities:
+
+```text
+Client Browser
+   |
+   | Next.js App Router + React Query
+   |
+Frontend API Services
+   |
+   | REST API + WebSocket Events
+   |
+NestJS Backend
+   |
+   |-- Auth Module
+   |-- Court Module
+   |-- Booking Module
+   |-- Payment Module
+   |-- Review Module
+   |-- Analytics Module
+   |-- Notification Gateway
+   |
+   | Prisma ORM
+   |
+PostgreSQL
+   |
+Redis
+   |
+PayOS Gateway
+```
+
+Core design goals:
+
+- Keep booking availability consistent in real time.
+- Prevent double booking before payment is completed.
+- Never trust client-side price calculation.
+- Fulfill paid bookings only after verified PayOS webhook confirmation.
+- Keep database writes atomic and recoverable.
+
+---
+
+## 4. System Workflow
+
+### Cache-First Booking & PayOS Fulfillment Flow
+
+```text
+1. User selects court + date + time slots
+2. Frontend sends booking request to NestJS API
+3. Backend validates:
+   - Court exists and is active
+   - Date is today or future
+   - Slots match HH:00 format
+   - Max 4 slots per request
+   - No duplicate slots
+   - Slots are not past or outside opening hours
+4. Backend recalculates price from database
+5. Redis locks selected slots for 10 minutes
+6. Backend creates temporary Redis order payload
+7. PayOS checkout link is generated
+8. User completes payment on PayOS
+9. PayOS sends webhook to backend
+10. Backend verifies webhook signature and payment amount
+11. Prisma transaction creates:
+    - Booking records
+    - Payment records
+12. Redis locks and temp order are cleared
+13. Socket.io broadcasts real-time updates
+```
+
+### Why this flow matters
+
+```text
+Without Redis:
+User A selects 18:00
+User B selects 18:00
+Both pay
+Double booking happens
+
+With Redis:
+User A locks 18:00 for checkout
+User B immediately sees 18:00 as pending/unavailable
+Only one payment can fulfill the slot
+```
+
+---
+
+## 5. Project Structure
+
+```text
+NOVA_booking/
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── (auth)/
+│   │   │   ├── (dashboard)/
+│   │   │   └── (main)/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   ├── types/
+│   │   └── utils/
+│   ├── package.json
+│   └── next.config.ts
+│
+├── nova-booking-backend/
+│   ├── src/
+│   │   ├── analytics/
+│   │   ├── auth/
+│   │   ├── booking/
+│   │   ├── cloudinary/
+│   │   ├── common/
+│   │   ├── court/
+│   │   ├── notification/
+│   │   ├── payment/
+│   │   ├── prisma/
+│   │   ├── redis/
+│   │   ├── review/
+│   │   └── users/
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   └── migrations/
+│   └── package.json
+│
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+## 6. Getting Started
 
 ### Prerequisites
-*   **Node.js** (v18.x or v20.x)
-*   **Docker Desktop** (for database and storage services)
 
-### Installation
+Make sure you have installed:
+
+- **Node.js 20+**
+- **npm**
+- **Docker Desktop**
+- **Ngrok** for PayOS webhook testing
+
+### 1. Clone Repository
+
 ```bash
-# Clone the repository
 git clone https://github.com/TruongDev24/nova-booking.git
 cd nova-booking
+```
 
-# Install Backend dependencies
+### 2. Install Dependencies
+
+Backend:
+
+```bash
 cd nova-booking-backend
 npm install
+```
 
-# Install Frontend dependencies
+Frontend:
+
+```bash
 cd ../frontend
 npm install
 ```
 
-### Environment Variables
-Create a `.env` file in `nova-booking-backend`:
-```env
-# Database connection
-DATABASE_URL="postgresql://user:password@localhost:5432/nova_db?schema=public"
+### 3. Configure Environment Files
 
-# Authentication
-JWT_SECRET="generate_a_secure_long_secret_here"
+Create backend environment file:
 
-# Cloudinary Storage
-CLOUDINARY_NAME="your_cloud_name"
-CLOUDINARY_API_KEY="your_api_key"
-CLOUDINARY_API_SECRET="your_api_secret"
+```bash
+cd nova-booking-backend
+cp .env.example .env
 ```
 
-### Run the App
-```bash
-# 1. Start the PostgreSQL database
-docker-compose up -d
+Create frontend environment file:
 
-# 2. Synchronize database schema (Backend)
+```bash
+cd ../frontend
+cp .env.example .env.local
+```
+
+Update values based on your local environment.
+
+### 4. Start Infrastructure
+
+From the project root:
+
+```bash
+docker-compose up -d
+```
+
+This starts PostgreSQL and Redis.
+
+### 5. Run Prisma Migration
+
+```bash
 cd nova-booking-backend
 npx prisma migrate dev
+npx prisma generate
+```
 
-# 3. Start Backend server (runs on Port 3001)
+Optional Prisma Studio:
+
+```bash
+npx prisma studio
+```
+
+### 6. Run Backend
+
+```bash
+cd nova-booking-backend
 npm run start:dev
+```
 
-# 4. Start Frontend server (runs on Port 3000)
-cd ../frontend
+Backend runs by default at:
+
+```text
+http://localhost:3001
+```
+
+### 7. Run Frontend
+
+```bash
+cd frontend
 npm run dev
 ```
 
----
-
-## 🧪 Testing & CI/CD
-
-### Automated Testing
-We maintain high code reliability through automated test suites:
-*   **Unit Tests**: Run `npm run test` in the backend to execute business logic validation (using Jest Mocking and FakeTimers).
-*   **Linting**: Run `npm run lint` to ensure code style compliance across the workspace.
-
-### CI/CD Pipeline
-Our **GitHub Actions** pipeline automatically validates every push to the `main` branch:
-1.  **Linting**: Verifies code standards.
-2.  **Type-checking**: Runs `tsc` to ensure zero type errors.
-3.  **Testing**: Executes the entire unit test suite.
-4.  **Building**: Validates that both Next.js and NestJS build successfully for production.
-
----
-
-## 📂 Folder Structure
+Frontend runs by default at:
 
 ```text
-nova-booking/
-├── frontend/                # Next.js Application
-│   ├── src/
-│   │   ├── app/             # App Router pages and layouts
-│   │   ├── services/        # API communication layer (Axios)
-│   │   ├── components/      # Reusable UI components (Recharts, etc.)
-│   │   └── utils/           # Timezone and formatting helpers
-│   └── public/              # Static assets
-├── nova-booking-backend/    # NestJS API
-│   ├── src/
-│   │   ├── auth/            # JWT, Passport strategies, and Guards
-│   │   ├── booking/         # Booking logic & 24h slot generation
-│   │   ├── court/           # Court management and Cloudinary upload
-│   │   ├── analytics/       # Data aggregation and stats logic
-│   │   └── prisma/          # Prisma Service and Client
-│   └── prisma/              # Schema definitions and migrations
-└── docker-compose.yml       # Shared infrastructure (Postgres)
+http://localhost:3000
+```
+
+### 8. Configure PayOS Webhook with Ngrok
+
+Start Ngrok:
+
+```bash
+ngrok http 3001
+```
+
+Use the generated HTTPS URL as your PayOS webhook endpoint:
+
+```text
+https://your-ngrok-url.ngrok-free.app/payment/webhook
 ```
 
 ---
 
-## ✍️ Author & License
+## 7. Environment Variables
 
-*   **Author**: [TruongDev24](https://github.com/TruongDev24)
-*   **License**: This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+### Backend `.env.example`
 
-**Built with precision and passion for the sports community.**
+```env
+# Application
+PORT=3001
+FRONTEND_URL=http://localhost:3000
+
+# Database
+DATABASE_URL=postgresql://root:rootpassword@localhost:5435/nova_booking_db?schema=public
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# JWT
+JWT_SECRET=your_secure_jwt_secret
+ADMIN_REGISTRATION_SECRET=your_admin_registration_secret
+
+# SMTP
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+
+# Cloudinary
+CLOUDINARY_NAME=your_cloudinary_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+
+# PayOS
+PAYOS_CLIENT_ID=your_payos_client_id
+PAYOS_API_KEY=your_payos_api_key
+PAYOS_CHECKSUM_KEY=your_payos_checksum_key
+```
+
+### Frontend `.env.local.example`
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+```
+
+---
+
+## 8. API Documentation
+
+The backend is designed to expose Swagger/OpenAPI documentation.
+
+After starting the backend, visit:
+
+```text
+http://localhost:3001/api
+```
+
+or, depending on your Swagger setup:
+
+```text
+http://localhost:3001/docs
+```
+
+Main API groups:
+
+- `Auth`
+- `Courts`
+- `Bookings`
+- `Payments`
+- `Reviews`
+- `Analytics`
+- `Users`
+- `Notifications`
+
+---
+
+## 9. Contributors
+
+| Name | Role |
+|---|---|
+| **TruongDev24** | Lead Full-Stack Developer |
+| **Nhâm** | Data / Business Analyst |
+| **Ly** | Design / Tester |
+
+---
+
+## 10. License
+
+This project is licensed under the **MIT License**.
+
+```text
+MIT License
+
+Copyright (c) 2026 NOVA Booking
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files, to deal in the Software
+without restriction, including without limitation the rights to use, copy,
+modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.
+```
+
+---
+
+## Final Note
+
+NOVA Booking is more than a CRUD booking system. It demonstrates real production concerns: concurrency control, payment integrity, transactional fulfillment, real-time synchronization, refund operations, and secure role-based workflows.

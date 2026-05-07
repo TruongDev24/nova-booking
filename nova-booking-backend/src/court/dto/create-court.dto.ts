@@ -1,10 +1,10 @@
 import {
+  IsArray,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   Min,
-  IsOptional,
-  IsArray,
   MinLength,
 } from 'class-validator';
 
