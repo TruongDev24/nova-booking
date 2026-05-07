@@ -16,7 +16,7 @@ import {
     AlertCircle
 } from "lucide-react";
 import {courtService, Court} from "@/services/court.service";
-import {bookingService, TimeSlot} from "@/services/booking.service";
+import {bookingService, TimeSlot, CreateBookingResponse} from "@/services/booking.service";
 import {toast, Toaster} from "react-hot-toast";
 import {useRouter} from "next/navigation";
 import Image from "next/image";
@@ -170,7 +170,7 @@ export default function CourtDetailPage({params}: PageProps) {
                     totalPrice: totalAmount,
                 }),
                 timeoutPromise
-            ]) as any;
+            ]) as CreateBookingResponse;
 
             toast.success("Đang chuyển hướng đến cổng thanh toán...", {id: loadingToast});
 
@@ -179,16 +179,17 @@ export default function CourtDetailPage({params}: PageProps) {
             } else {
                 throw new Error("Không nhận được link thanh toán");
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Booking Error:", error);
             
-            if (error.message === "TIMEOUT") {
+            const err = error as { message?: string; response?: { data?: { message?: string }, status?: number } };
+            if (err.message === "TIMEOUT") {
                 toast.error("Kết nối không ổn định, vui lòng kiểm tra lại đơn hàng trước khi thử lại", {id: loadingToast});
             } else {
-                const message = error.response?.data?.message || "Đặt sân thất bại. Vui lòng thử lại.";
+                const message = err.response?.data?.message || "Đặt sân thất bại. Vui lòng thử lại.";
                 toast.error(message, {id: loadingToast});
 
-                if (error.response?.status === 401) {
+                if (err.response?.status === 401) {
                     router.push("/login");
                 }
             }

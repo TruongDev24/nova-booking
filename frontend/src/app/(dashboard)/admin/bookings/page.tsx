@@ -87,7 +87,7 @@ export default function AdminBookingsPage() {
             setBookingToConfirm(null);
             toast.success("Đã xác nhận đơn hàng!");
         },
-        onError: (error: any) => {
+        onError: (error: { response?: { data?: { message?: string } } }) => {
             const message = error.response?.data?.message || "Lỗi khi xác nhận đơn hàng";
             toast.error(message);
         }
@@ -100,7 +100,7 @@ export default function AdminBookingsPage() {
             setBookingToCancel(null);
             toast.success("Đã hủy đơn thành công");
         },
-        onError: (error: any) => {
+        onError: (error: { response?: { data?: { message?: string } } }) => {
             const message = error.response?.data?.message || "Lỗi khi hủy đơn hàng";
             toast.error(message);
         }
@@ -113,7 +113,7 @@ export default function AdminBookingsPage() {
             setBookingToRefund(null);
             toast.success("Hoàn tiền thành công!");
         },
-        onError: (error: any) => {
+        onError: (error: { response?: { data?: { message?: string } } }) => {
             const message = error.response?.data?.message || "Lỗi khi cập nhật trạng thái hoàn tiền";
             toast.error(message);
         }
@@ -253,11 +253,11 @@ export default function AdminBookingsPage() {
                             </Button>
                         )}
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
+                            <DropdownMenuTrigger render={
                                 <Button variant="ghost" className="h-8 w-8 p-0">
                                     <MoreHorizontal className="h-4 w-4" />
                                 </Button>
-                            </DropdownMenuTrigger>
+                            } />
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Thao tác đơn</DropdownMenuLabel>
                                 {booking.status === "PENDING" && (
@@ -423,14 +423,14 @@ export default function AdminBookingsPage() {
 
                     <AlertDialogFooter className="sm:flex-col gap-2">
                         <AlertDialogAction
-                            disabled={!bookingToRefund?.user?.bankAccountNumber || refundMutation.isLoading}
+                            disabled={!bookingToRefund?.user?.bankAccountNumber || refundMutation.isPending}
                             onClick={(e) => {
                                 e.preventDefault();
                                 if (bookingToRefund) refundMutation.mutate(bookingToRefund.id);
                             }}
                             className="w-full rounded-2xl h-14 bg-emerald-600 text-white hover:bg-emerald-700 font-black uppercase tracking-widest shadow-lg shadow-emerald-100"
                         >
-                            {refundMutation.isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Xác nhận đã chuyển khoản"}
+                            {refundMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Xác nhận đã chuyển khoản"}
                         </AlertDialogAction>
                         <AlertDialogCancel className="w-full rounded-2xl h-14 font-bold border-none hover:bg-slate-100">
                             Để sau
@@ -449,14 +449,14 @@ export default function AdminBookingsPage() {
                     <AlertDialogFooter className="gap-3">
                         <AlertDialogCancel className="rounded-xl h-11 font-bold">Hủy bỏ</AlertDialogCancel>
                         <AlertDialogAction 
-                            disabled={cancelMutation.isLoading}
+                            disabled={cancelMutation.isPending}
                             onClick={(e) => {
                                 e.preventDefault();
                                 if (bookingToCancel) cancelMutation.mutate(bookingToCancel);
                             }} 
                             className="rounded-xl h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold min-w-[120px]"
                         >
-                            {cancelMutation.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận hủy"}
+                            {cancelMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận hủy"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -471,14 +471,14 @@ export default function AdminBookingsPage() {
                     <AlertDialogFooter className="gap-3">
                         <AlertDialogCancel className="rounded-xl h-11 font-bold">Quay lại</AlertDialogCancel>
                         <AlertDialogAction 
-                            disabled={confirmMutation.isLoading}
+                            disabled={confirmMutation.isPending}
                             onClick={(e) => {
                                 e.preventDefault();
                                 if (bookingToConfirm) confirmMutation.mutate(bookingToConfirm);
                             }} 
                             className="rounded-xl h-11 bg-emerald-600 text-white hover:bg-emerald-700 font-bold min-w-[120px]"
                         >
-                            {confirmMutation.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận ngay"}
+                            {confirmMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận ngay"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

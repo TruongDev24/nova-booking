@@ -235,10 +235,10 @@ describe('BookingService', () => {
 
       expect(prisma.booking.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          data: {
             status: 'CANCELLED',
             refundStatus: 'PENDING',
-          }),
+          },
         }),
       );
     });

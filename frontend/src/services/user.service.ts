@@ -6,12 +6,21 @@ export interface BankInfo {
     bankAccountName: string;
 }
 
+export interface User {
+    id: string;
+    fullName: string;
+    email: string;
+    bankName?: string;
+    bankAccountNumber?: string;
+    bankAccountName?: string;
+}
+
 export const userService = {
     updateBankInfo: async (data: BankInfo) => {
         const response = await apiClient.patch("/users/profile/bank", data);
         return response.data;
     },
-    getProfile: async () => {
+    getProfile: async (): Promise<User> => {
         const response = await apiClient.get("/auth/me");
         return response.data;
     }

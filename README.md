@@ -433,17 +433,8 @@ Main API groups:
 
 ---
 
-## 9. Contributors
 
-| Name | Role |
-|---|---|
-| **TruongDev24** | Lead Full-Stack Developer |
-| **Nhâm** | Data / Business Analyst |
-| **Ly** | Design / Tester |
-
----
-
-## 10. License
+## 9. License
 
 This project is licensed under the **MIT License**.
 

@@ -18,6 +18,11 @@ export interface CreateBookingData {
     totalPrice: number;
 }
 
+export interface CreateBookingResponse {
+    checkoutUrl: string;
+    orderCode: number;
+}
+
 export interface Booking {
     id: string;
     bookingDate: string;
@@ -65,7 +70,7 @@ export const bookingService = {
         return response.data?.data || response.data || [];
     },
 
-    createBooking: async (data: CreateBookingData) => {
+    createBooking: async (data: CreateBookingData): Promise<CreateBookingResponse> => {
         const response = await apiClient.post(`/bookings`, data);
         return response.data;
     },

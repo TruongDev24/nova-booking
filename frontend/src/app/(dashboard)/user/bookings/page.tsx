@@ -92,8 +92,9 @@ export default function MyBookingsPage() {
             await bookingService.cancelBooking(id);
             toast.success("Hủy lịch thành công");
             void fetchBookings();
-        } catch (error: any) {
-            const message = error.response?.data?.message || "Không thể hủy lịch";
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { message?: string } } };
+            const message = err.response?.data?.message || "Không thể hủy lịch";
             toast.error(message);
         } finally {
             setIsCancelling(null);

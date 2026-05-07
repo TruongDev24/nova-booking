@@ -36,8 +36,14 @@ export class BookingController {
   // API xem slot phải là PUBLIC
   @Public()
   @Get('courts/:courtId/slots')
-  @ApiOperation({ summary: 'View available slots for a specific court and date' })
-  @ApiQuery({ name: 'date', required: true, description: 'Date in YYYY-MM-DD format' })
+  @ApiOperation({
+    summary: 'View available slots for a specific court and date',
+  })
+  @ApiQuery({
+    name: 'date',
+    required: true,
+    description: 'Date in YYYY-MM-DD format',
+  })
   @ApiResponse({ status: 200, description: 'Returns array of time slots' })
   getSlots(@Param('courtId') courtId: string, @Query('date') date: string) {
     if (!date) {
@@ -49,8 +55,14 @@ export class BookingController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Create a new multi-slot booking' })
-  @ApiResponse({ status: 201, description: 'Booking created and payment link generated' })
-  @ApiResponse({ status: 409, description: 'Slots are already locked or booked' })
+  @ApiResponse({
+    status: 201,
+    description: 'Booking created and payment link generated',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Slots are already locked or booked',
+  })
   create(
     @Body() createBookingDto: CreateBookingDto,
     @GetUser() user: UserPayload,
@@ -72,8 +84,14 @@ export class BookingController {
   @Patch(':id/cancel')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Cancel a booking (Customer flow)' })
-  @ApiResponse({ status: 200, description: 'Booking cancelled and refund initialized' })
-  @ApiResponse({ status: 400, description: 'Cancellation blocked by 12h policy' })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking cancelled and refund initialized',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Cancellation blocked by 12h policy',
+  })
   cancel(@Param('id') id: string, @GetUser() user: UserPayload) {
     return this.bookingService.cancelBooking(id, user.sub);
   }
@@ -116,8 +134,13 @@ export class BookingController {
   @Patch('admin/:id/refund')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Mark a booking as refunded (Admin manual transfer)' })
-  @ApiResponse({ status: 200, description: 'Refund status updated to COMPLETED' })
+  @ApiOperation({
+    summary: 'Mark a booking as refunded (Admin manual transfer)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Refund status updated to COMPLETED',
+  })
   markAsRefunded(@Param('id') id: string, @GetUser() user: UserPayload) {
     return this.bookingService.markAsRefunded(id, user.sub);
   }

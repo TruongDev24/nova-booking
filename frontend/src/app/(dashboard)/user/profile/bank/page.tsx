@@ -36,16 +36,20 @@ export default function BankProfilePage() {
     const { data: user, isLoading: isUserLoading } = useQuery({
         queryKey: ["user-profile"],
         queryFn: () => userService.getProfile(),
-        onSuccess: (data) => {
-            if (data) {
-                setFormData({
-                    bankName: data.bankName || "",
-                    bankAccountNumber: data.bankAccountNumber || "",
-                    bankAccountName: data.bankAccountName || ""
-                });
-            }
-        }
     });
+
+    const isInitialized = React.useRef(false);
+
+    React.useEffect(() => {
+        if (user && !isInitialized.current) {
+            setFormData({
+                bankName: user.bankName || "",
+                bankAccountNumber: user.bankAccountNumber || "",
+                bankAccountName: user.bankAccountName || ""
+            });
+            isInitialized.current = true;
+        }
+    }, [user]);
 
     // 2. Fetch Banks from VietQR
     const { data: banks, isLoading: isBanksLoading } = useQuery({
@@ -168,10 +172,10 @@ export default function BankProfilePage() {
 
                         <button
                             type="submit"
-                            disabled={mutation.isLoading}
+                            disabled={mutation.isPending}
                             className="w-full h-16 bg-emerald-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-100 hover:shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                         >
-                            {mutation.isLoading ? (
+                            {mutation.isPending ? (
                                 <Loader2 className="w-6 h-6 animate-spin" />
                             ) : (
                                 <>

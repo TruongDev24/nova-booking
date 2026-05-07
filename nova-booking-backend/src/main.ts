@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 // Support BigInt serialization for JSON responses
 // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -34,6 +35,16 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
+
+  // --- Swagger Configuration ---
+  const config = new DocumentBuilder()
+    .setTitle('NOVA Booking API')
+    .setDescription('The core booking engine for Nova Badminton Management')
+    .setVersion('1.0')
+    .addBearerAuth() // Required for JWT-protected routes
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
 
   // QUAN TRỌNG: Lắng nghe trên 0.0.0.0 để Docker có thể truy cập
   const port = process.env.PORT || 3001;

@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -135,8 +134,11 @@ export class BookingService {
     try {
       pendingCount = await this.redisService.scard(pendingOrdersKey);
     } catch (error) {
-      this.logger.error(`Redis scard failure: ${error.message}`);
-      throw new ServiceUnavailableException('Hệ thống giữ chỗ đang bận, vui lòng thử lại sau');
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Redis scard failure: ${message}`);
+      throw new ServiceUnavailableException(
+        'Hệ thống giữ chỗ đang bận, vui lòng thử lại sau',
+      );
     }
 
     if (pendingCount >= 3) {
@@ -220,7 +222,8 @@ export class BookingService {
           600, // 10 minutes TTL
         );
       } catch (error) {
-        this.logger.error(`Redis locking failure: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Redis locking failure: ${message}`);
         throw new ServiceUnavailableException(
           'Hệ thống giữ chỗ đang bận, vui lòng thử lại sau',
         );
@@ -231,7 +234,7 @@ export class BookingService {
         for (const key of acquiredLocks) {
           try {
             await this.redisService.del(key);
-          } catch (e) {
+          } catch {
             // Silent catch on cleanup
           }
         }
