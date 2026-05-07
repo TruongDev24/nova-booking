@@ -92,6 +92,7 @@ export const bookingService = {
         limit?: number;
         search?: string;
         status?: string;
+        refundStatus?: string;
         startDate?: string;
         endDate?: string;
         sortBy?: string;

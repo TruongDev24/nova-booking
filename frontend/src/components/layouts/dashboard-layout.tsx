@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Cookies from "js-cookie";
 import {authService} from "@/services/auth.service";
+import {handleComingSoon} from "@/utils/coming-soon";
 
 import {
     Sidebar,
@@ -190,16 +191,20 @@ export function DashboardLayout({
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="relative hidden md:block">
+                        <div className="relative hidden md:block opacity-60 cursor-not-allowed">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/>
                             <Input
                                 type="search"
-                                placeholder="Tìm kiếm..."
-                                className="w-64 pl-9 rounded-full bg-muted/50 border-none focus-visible:ring-1"
+                                placeholder="Tìm kiếm... (Sắp ra mắt)"
+                                disabled
+                                className="w-64 pl-9 rounded-full bg-muted/50 border-none cursor-not-allowed"
                             />
                         </div>
 
-                        <button className="p-2 text-muted-foreground hover:text-foreground relative">
+                        <button 
+                            onClick={() => handleComingSoon()}
+                            className="p-2 text-muted-foreground hover:text-foreground relative opacity-60 cursor-not-allowed"
+                        >
                             <Bell className="w-5 h-5"/>
                             <span
                                 className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
@@ -234,7 +239,10 @@ export function DashboardLayout({
                                         <User className="mr-2 h-4 w-4"/>
                                         <span>Hồ sơ</span>
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                        onClick={() => handleComingSoon()}
+                                        className="opacity-60 cursor-not-allowed"
+                                    >
                                         <Settings className="mr-2 h-4 w-4"/>
                                         <span>Cài đặt</span>
                                     </DropdownMenuItem>

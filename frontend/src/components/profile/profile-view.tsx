@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import {authService} from "@/services/auth.service";
 import {toast} from "sonner";
+import {handleComingSoon} from "@/utils/coming-soon";
 import {
     Card,
     CardContent,
@@ -203,6 +204,36 @@ export function ProfileView() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Bank Info Section */}
+                    <Card className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden bg-white/80 backdrop-blur-xl">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                                    <Activity className="w-6 h-6" />
+                                </div>
+                                Thông tin hoàn tiền
+                            </CardTitle>
+                            <CardDescription className="ml-11">Quản lý tài khoản ngân hàng để nhận lại tiền khi hủy lịch</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <div className="p-6 rounded-[2rem] bg-slate-900 text-white relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl group-hover:bg-emerald-500/30 transition-all duration-500"></div>
+                                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                                    <div className="space-y-1">
+                                        <h3 className="font-bold text-lg">Cập nhật tài khoản ngân hàng</h3>
+                                        <p className="text-slate-400 text-sm">Hệ thống sẽ tự động hoàn tiền vào tài khoản này.</p>
+                                    </div>
+                                    <Button 
+                                        onClick={() => window.location.href = "/user/profile/bank"}
+                                        className="h-12 px-8 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                                    >
+                                        Cập nhật ngay
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* Right Column: Change Password */}
@@ -304,9 +335,12 @@ export function ProfileView() {
                 </div>
             </div>
 
-            <div className="flex items-center justify-center gap-2 text-slate-400 text-xs py-4">
+            <div 
+                onClick={() => handleComingSoon()}
+                className="flex items-center justify-center gap-2 text-slate-400 text-xs py-4 cursor-help opacity-70 hover:opacity-100 transition-opacity"
+            >
                 <Activity className="w-3 h-3"/>
-                <span>Trạng thái hệ thống: Ổn định</span>
+                <span>Trạng thái hệ thống: Ổn định (Chi tiết)</span>
             </div>
         </div>
     );

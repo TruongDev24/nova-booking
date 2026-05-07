@@ -105,6 +105,7 @@ export class BookingController {
     @GetUser() user: UserPayload,
     @Query() query: PaginationQueryDto,
     @Query('status') status?: BookingStatus,
+    @Query('refundStatus') refundStatus?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
@@ -112,6 +113,7 @@ export class BookingController {
       user.sub,
       query,
       status,
+      refundStatus,
       startDate,
       endDate,
     );

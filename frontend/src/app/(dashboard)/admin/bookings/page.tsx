@@ -12,7 +12,8 @@ import {
     ArrowRight,
     Wallet,
     QrCode,
-    Loader2
+    Loader2,
+    Activity
 } from "lucide-react";
 import { bookingService, Booking } from "@/services/booking.service";
 import { toast } from "sonner";
@@ -28,7 +29,6 @@ import {
     DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +54,6 @@ export default function AdminBookingsPage() {
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
 
-    const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
     const [bookingToConfirm, setBookingToConfirm] = useState<string | null>(null);
     const [bookingToRefund, setBookingToRefund] = useState<Booking | null>(null);
 
@@ -63,9 +62,10 @@ export default function AdminBookingsPage() {
         queryKey: ["admin-bookings", search, status, startDate, endDate, view],
         queryFn: () => bookingService.getAllAdmin({
             page: 1,
-            limit: 50, // Increase limit for admin
+            limit: 50, 
             search,
             status: view === "refunds" ? "CANCELLED" : status,
+            refundStatus: view === "refunds" ? "PENDING" : undefined,
             startDate,
             endDate
         }),
@@ -93,18 +93,6 @@ export default function AdminBookingsPage() {
         }
     });
 
-    const cancelMutation = useMutation({
-        mutationFn: (id: string) => bookingService.cancelBookingAdmin(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
-            setBookingToCancel(null);
-            toast.success("Đã hủy đơn thành công");
-        },
-        onError: (error: { response?: { data?: { message?: string } } }) => {
-            const message = error.response?.data?.message || "Lỗi khi hủy đơn hàng";
-            toast.error(message);
-        }
-    });
 
     const refundMutation = useMutation({
         mutationFn: (id: string) => bookingService.markAsRefundedAdmin(id),
@@ -240,6 +228,8 @@ export default function AdminBookingsPage() {
             id: "actions",
             cell: ({ row }) => {
                 const booking = row.original;
+                const hasActions = booking.status === "PENDING";
+
                 return (
                     <div className="flex items-center gap-2">
                         {booking.status === "CANCELLED" && booking.refundStatus === "PENDING" && (
@@ -252,29 +242,26 @@ export default function AdminBookingsPage() {
                                 <QrCode className="mr-2 h-3 w-3" /> Hoàn tiền
                             </Button>
                         )}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger render={
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                            } />
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Thao tác đơn</DropdownMenuLabel>
-                                {booking.status === "PENDING" && (
-                                    <DropdownMenuItem onClick={() => setBookingToConfirm(booking.id)}>
-                                        <Check className="mr-2 h-4 w-4 text-emerald-500" /> Xác nhận đơn
-                                    </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    onClick={() => setBookingToCancel(booking.id)}
-                                    className="text-destructive focus:text-destructive"
-                                    disabled={booking.status === "CANCELLED"}
-                                >
-                                    <XCircle className="mr-2 h-4 w-4" /> Hủy đơn đặt
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        
+                        {hasActions ? (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger render={
+                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                } />
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuGroup>
+                                        <DropdownMenuLabel>Thao tác đơn</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => setBookingToConfirm(booking.id)}>
+                                            <Check className="mr-2 h-4 w-4 text-emerald-500" /> Xác nhận đơn
+                                        </DropdownMenuItem>
+                                    </DropdownMenuGroup>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        ) : (
+                            <div className="w-8" />
+                        )}
                     </div>
                 );
             },
@@ -308,6 +295,14 @@ export default function AdminBookingsPage() {
                         </span>
                         <span className={`text-3xl font-black leading-none mt-1.5 ${view === "refunds" ? "text-rose-600" : ""}`}>{bookings.length}</span>
                     </div>
+                    <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="rounded-full h-12 w-12 border-slate-100"
+                        onClick={() => queryClient.invalidateQueries({ queryKey: ["admin-bookings"] })}
+                    >
+                        <Activity className="w-5 h-5 text-slate-400" />
+                    </Button>
                 </div>
             </div>
 
@@ -439,28 +434,6 @@ export default function AdminBookingsPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Standard Confirm/Cancel Dialogs */}
-            <AlertDialog open={!!bookingToCancel} onOpenChange={() => setBookingToCancel(null)}>
-                <AlertDialogContent className="rounded-[2rem]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-black uppercase">Hủy đơn đặt sân?</AlertDialogTitle>
-                        <AlertDialogDescription className="font-medium">Bạn có chắc chắn muốn hủy đơn này?</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-3">
-                        <AlertDialogCancel className="rounded-xl h-11 font-bold">Hủy bỏ</AlertDialogCancel>
-                        <AlertDialogAction 
-                            disabled={cancelMutation.isPending}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                if (bookingToCancel) cancelMutation.mutate(bookingToCancel);
-                            }} 
-                            className="rounded-xl h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold min-w-[120px]"
-                        >
-                            {cancelMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận hủy"}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
 
             <AlertDialog open={!!bookingToConfirm} onOpenChange={() => setBookingToConfirm(null)}>
                 <AlertDialogContent className="rounded-[2rem]">

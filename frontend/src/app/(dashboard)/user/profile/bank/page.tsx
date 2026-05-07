@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { userService, BankInfo } from "@/services/user.service";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { 
     CreditCard, 
     Building2, 
@@ -32,13 +32,13 @@ export default function BankProfilePage() {
         bankAccountName: ""
     });
 
+    const isInitialized = React.useRef(false);
+
     // 1. Fetch User Profile to pre-fill form
     const { data: user, isLoading: isUserLoading } = useQuery({
         queryKey: ["user-profile"],
         queryFn: () => userService.getProfile(),
     });
-
-    const isInitialized = React.useRef(false);
 
     React.useEffect(() => {
         if (user && !isInitialized.current) {

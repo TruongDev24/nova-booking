@@ -10,7 +10,8 @@ import {
     Loader2,
     Trash2,
     Star,
-    CreditCard
+    CreditCard,
+    AlertCircle
 } from "lucide-react";
 import {bookingService} from "@/services/booking.service";
 import {paymentService} from "@/services/payment.service";
@@ -18,6 +19,7 @@ import {toast, Toaster} from "react-hot-toast";
 import {formatToVietnamDate} from "@/utils/date-format";
 import Image from "next/image";
 import {ReviewDialog} from "@/components/reviews/ReviewDialog";
+import {userService, User} from "@/services/user.service";
 
 interface Booking {
     id: string;
@@ -43,6 +45,7 @@ interface Booking {
 
 export default function MyBookingsPage() {
     const [bookings, setBookings] = useState<Booking[]>([]);
+    const [userProfile, setUserProfile] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
     const [isCancelling, setIsCancelling] = useState<string | null>(null);
@@ -50,8 +53,12 @@ export default function MyBookingsPage() {
     const fetchBookings = React.useCallback(async () => {
         try {
             setIsLoading(true);
-            const data = await bookingService.getMyBookings();
-            setBookings(data);
+            const [bookingsData, profileData] = await Promise.all([
+                bookingService.getMyBookings(),
+                userService.getProfile()
+            ]);
+            setBookings(bookingsData);
+            setUserProfile(profileData);
         } catch (error) {
             console.error(error);
             toast.error("Không thể tải lịch sử đặt sân");
@@ -259,7 +266,20 @@ export default function MyBookingsPage() {
                                         {booking.status !== "CANCELLED" && booking.status !== "COMPLETED" && (
                                             <>
                                                 {booking.paymentStatus === "PAID" ? (
-                                                    canCancel(booking.bookingDate, booking.startTime) ? (
+                                                    !userProfile?.bankAccountNumber || !userProfile?.bankName ? (
+                                                        <div className="flex flex-col items-end gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100 max-w-sm">
+                                                            <div className="flex items-start gap-2 text-amber-800 text-[11px] font-medium leading-relaxed">
+                                                                <AlertCircle className="w-4 h-4 shrink-0 text-amber-500 mt-0.5" />
+                                                                <span>Cần cập nhật thông tin ngân hàng để nhận hoàn tiền trước khi hủy.</span>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => window.location.href = "/user/profile/bank"}
+                                                                className="text-[11px] font-black uppercase text-amber-600 hover:text-amber-700 underline underline-offset-4"
+                                                            >
+                                                                Cập nhật ngay
+                                                            </button>
+                                                        </div>
+                                                    ) : canCancel(booking.bookingDate, booking.startTime) ? (
                                                         <button
                                                             disabled={isCancelling === booking.id}
                                                             onClick={() => handleCancel(booking.id)}

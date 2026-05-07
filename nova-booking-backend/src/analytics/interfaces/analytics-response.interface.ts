@@ -17,6 +17,7 @@ export interface AnalyticsResponse {
     totalBookedHours: number;
     occupancyRate: number;
     cancelRate: number;
+    debugId?: number;
   };
   revenueChart: {
     date: string;

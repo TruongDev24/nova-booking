@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
-import { BookingStatus, Prisma } from '@prisma/client';
+import { BookingStatus, Prisma, RefundStatus } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { RedisService } from '../redis/redis.service';
 import { PaymentService } from '../payment/payment.service';
@@ -369,6 +369,18 @@ export class BookingService {
       throw new BadRequestException('Lịch này đã được hủy trước đó');
     }
 
+    // --- NEW: Hard Lock - Must have bank info to cancel PAID booking ---
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { bankAccountNumber: true, bankName: true },
+    });
+
+    if (!user?.bankAccountNumber || !user?.bankName) {
+      throw new BadRequestException(
+        'Vui lòng cập nhật thông tin ngân hàng trong trang Cá nhân trước khi thực hiện hủy đơn để chúng tôi có thể hoàn tiền cho bạn.',
+      );
+    }
+
     // 12-hour cancellation policy
     const [year, month, day] = booking.bookingDate.split('-').map(Number);
     const [hour, minute] = booking.startTime.split(':').map(Number);
@@ -431,6 +443,7 @@ export class BookingService {
     userId: string,
     query: PaginationQueryDto,
     status?: BookingStatus,
+    refundStatus?: string,
     startDate?: string,
     endDate?: string,
   ) {
@@ -444,6 +457,10 @@ export class BookingService {
 
     if (status) {
       where.status = status;
+    }
+
+    if (refundStatus) {
+      where.refundStatus = refundStatus as RefundStatus;
     }
 
     // Date Range Filtering
@@ -492,7 +509,15 @@ export class BookingService {
         where,
         include: {
           user: {
-            select: { id: true, fullName: true, phone: true, email: true },
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              email: true,
+              bankName: true,
+              bankAccountNumber: true,
+              bankAccountName: true,
+            },
           },
           court: {
             select: { id: true, name: true, location: true },
@@ -558,14 +583,10 @@ export class BookingService {
       throw new ForbiddenException('Bạn không có quyền hủy đơn hàng này');
     }
 
-    if (booking.status === BookingStatus.CANCELLED) {
-      throw new BadRequestException('Đơn hàng này đã được hủy trước đó');
-    }
-
-    return this.prisma.booking.update({
-      where: { id },
-      data: { status: BookingStatus.CANCELLED },
-    });
+    // Business Rule: Admins cannot cancel bookings anymore. Only Users can cancel.
+    throw new ForbiddenException(
+      'Chủ sân không được phép tự ý hủy đơn của khách',
+    );
   }
 
   async markAsRefunded(id: string, adminId: string) {
@@ -604,7 +625,10 @@ export class BookingService {
 
     return this.prisma.booking.update({
       where: { id },
-      data: { refundStatus: 'COMPLETED' },
+      data: {
+        refundStatus: 'COMPLETED',
+        paymentStatus: 'REFUNDED',
+      },
     });
   }
 }

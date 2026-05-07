@@ -4,10 +4,11 @@ import React, {useState, useEffect} from "react";
 import {Search, MapPin, Star, Clock, ArrowRight, Image as ImageIcon} from "lucide-react";
 import {courtService, PaginatedCourts, Court} from "@/services/court.service";
 import Link from "next/link";
+import { CourtCard } from "@/components/ui/court-card";
 import {toast as hotToast, Toaster} from "react-hot-toast";
 import {toast} from "sonner";
-import Image from "next/image";
 import {useSocket} from "@/hooks/useSocket";
+import {handleComingSoon} from "@/utils/coming-soon";
 
 export default function ExploreCourtsPage() {
     const [courtsData, setCourtsData] = useState<PaginatedCourts | null>(null);
@@ -39,17 +40,14 @@ export default function ExploreCourtsPage() {
     useEffect(() => {
         if (!socket) return;
 
-        // Listen for new courts being added by admins
         socket.on("court_added", (newCourt: Court) => {
             toast.success("Một sân cầu lông mới vừa được thêm!", {
                 description: `Sân ${newCourt.name} tại ${newCourt.location} đã sẵn sàng phục vụ.`,
                 duration: 10000,
             });
 
-            // Optimistically update the list (unshift to top)
             setCourtsData(prev => {
                 if (!prev) return prev;
-                // Avoid duplicates if already added by fetchCourts
                 if (prev.data.some(c => c.id === newCourt.id)) return prev;
                 return {
                     ...prev,
@@ -59,7 +57,6 @@ export default function ExploreCourtsPage() {
             });
         });
 
-        // Listen for court status changes (maintenance/closure)
         socket.on("court_status_changed", (data: { id: string; isDeleted: boolean; name: string }) => {
             setCourtsData(prev => {
                 if (!prev) return prev;
@@ -84,7 +81,7 @@ export default function ExploreCourtsPage() {
             socket.off("court_added");
             socket.off("court_status_changed");
         };
-    }, [socket, fetchCourts]);
+    }, [socket]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -139,7 +136,7 @@ export default function ExploreCourtsPage() {
                         <h2 className="text-3xl font-black text-slate-900">Sân gợi ý cho bạn</h2>
                         <p className="text-slate-500 text-sm mt-1">Dựa trên đánh giá và vị trí của bạn</p>
                     </div>
-                    <Link href="/courts"
+                    <Link href="/user/courts"
                           className="text-sm font-bold text-cyan-600 hover:text-cyan-700 flex items-center gap-1 group bg-cyan-50 px-4 py-2 rounded-full transition-all">
                         Xem tất cả <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform"/>
                     </Link>
@@ -149,16 +146,7 @@ export default function ExploreCourtsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {[1, 2, 3].map((i) => (
                             <div key={i}
-                                 className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm animate-pulse">
-                                <div className="h-64 bg-slate-100"></div>
-                                <div className="p-6 space-y-4">
-                                    <div className="h-6 bg-slate-100 rounded w-3/4"></div>
-                                    <div className="h-4 bg-slate-100 rounded w-1/2"></div>
-                                    <div className="pt-4 border-t border-slate-50 flex justify-between">
-                                        <div className="h-8 bg-slate-100 rounded w-1/4"></div>
-                                        <div className="h-10 bg-slate-100 rounded w-1/3"></div>
-                                    </div>
-                                </div>
+                                 className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm animate-pulse h-[400px]">
                             </div>
                         ))}
                     </div>
@@ -172,66 +160,7 @@ export default function ExploreCourtsPage() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {courts.map((court: Court) => (
-                            <div key={court.id}
-                                 className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group">
-                                {/* Image Cover */}
-                                <div className="relative h-64 overflow-hidden">
-                                    {court.images?.[0] ? (
-                                        <Image
-                                            src={court.images[0]}
-                                            alt={court.name}
-                                            fill
-                                            className="object-cover group-hover:scale-110 transition-transform duration-700"
-                                        />
-                                    ) : (
-                                        <div
-                                            className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">
-                                            <ImageIcon className="w-12 h-12"/>
-                                        </div>
-                                    )}
-                                    <div
-                                        className="absolute top-5 left-5 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
-                                        <Star className="w-4 h-4 text-amber-500 fill-amber-500"/>
-                                        <span className="text-sm font-black text-slate-900">
-                      {court.avgRating ? court.avgRating.toFixed(1) : "Chưa có"}
-                    </span>
-                                        {court.totalReviews > 0 && (
-                                            <span className="text-[10px] text-slate-400 font-bold ml-1">
-                        ({court.totalReviews})
-                      </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Content */}
-                                <div className="p-8 space-y-6">
-                                    <div>
-                                        <h3 className="text-2xl font-black text-slate-900 mb-2 group-hover:text-cyan-600 transition-colors">
-                                            {court.name}
-                                        </h3>
-                                        <div className="flex items-center gap-2 text-slate-500 font-medium">
-                                            <MapPin className="w-4 h-4 text-cyan-500"/>
-                                            <span className="text-sm line-clamp-1">{court.location}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between pt-6 border-t border-slate-50">
-                                        <div className="flex flex-col">
-                                            <span
-                                                className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Giá mỗi giờ</span>
-                                            <span className="text-2xl font-black text-slate-900">
-                        {court.pricePerHour.toLocaleString()}đ
-                      </span>
-                                        </div>
-                                        <Link
-                                            href={`/courts/${court.id}`}
-                                            className="bg-slate-900 text-white px-6 py-3.5 rounded-2xl text-sm font-black hover:bg-cyan-600 transition-all shadow-xl shadow-slate-900/10 active:scale-95"
-                                        >
-                                            Đặt sân ngay
-                                        </Link>
-                                    </div>
-                                </div>
-                            </div>
+                            <CourtCard key={court.id} court={court} />
                         ))}
                     </div>
                 )}
@@ -240,7 +169,10 @@ export default function ExploreCourtsPage() {
             {/* Quick Info Section */}
             <section
                 className="grid grid-cols-1 sm:grid-cols-3 gap-8 bg-slate-50 p-10 rounded-[2.5rem] border border-slate-100">
-                <div className="flex items-center gap-5">
+                <div 
+                    onClick={() => handleComingSoon()}
+                    className="flex items-center gap-5 cursor-not-allowed opacity-80 hover:opacity-100 transition-opacity"
+                >
                     <div className="bg-white p-4 rounded-2xl shadow-sm text-cyan-600">
                         <Clock className="w-7 h-7"/>
                     </div>
@@ -249,7 +181,10 @@ export default function ExploreCourtsPage() {
                         <p className="text-sm text-slate-500">Mở cửa đặt mọi lúc mọi nơi</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-5">
+                <div 
+                    onClick={() => handleComingSoon()}
+                    className="flex items-center gap-5 cursor-not-allowed opacity-80 hover:opacity-100 transition-opacity"
+                >
                     <div className="bg-white p-4 rounded-2xl shadow-sm text-cyan-600">
                         <MapPin className="w-7 h-7"/>
                     </div>
@@ -258,7 +193,10 @@ export default function ExploreCourtsPage() {
                         <p className="text-sm text-slate-500">Hỗ trợ tìm sân theo vị trí</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-5">
+                <div 
+                    onClick={() => handleComingSoon()}
+                    className="flex items-center gap-5 cursor-not-allowed opacity-80 hover:opacity-100 transition-opacity"
+                >
                     <div className="bg-white p-4 rounded-2xl shadow-sm text-cyan-600">
                         <Star className="w-7 h-7"/>
                     </div>

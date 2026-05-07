@@ -21,7 +21,7 @@ export const userService = {
         return response.data;
     },
     getProfile: async (): Promise<User> => {
-        const response = await apiClient.get("/auth/me");
+        const response = await apiClient.get("/auth/profile");
         return response.data;
     }
 };

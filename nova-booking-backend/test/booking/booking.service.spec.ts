@@ -205,6 +205,10 @@ describe('BookingService', () => {
       };
 
       prisma.booking.findUnique.mockResolvedValue(nearBooking as any);
+      prisma.user.findUnique.mockResolvedValue({
+        bankName: 'VCB',
+        bankAccountNumber: '123456',
+      } as any);
 
       await expect(
         service.cancelBooking('booking-id', mockUserId),
@@ -225,6 +229,10 @@ describe('BookingService', () => {
 
     it('3. Happy Path: Should set refundStatus to PENDING on successful cancellation', async () => {
       prisma.booking.findUnique.mockResolvedValue(mockBooking as any);
+      prisma.user.findUnique.mockResolvedValue({
+        bankName: 'VCB',
+        bankAccountNumber: '123456',
+      } as any);
       prisma.booking.update.mockResolvedValue({
         ...mockBooking,
         status: 'CANCELLED',
@@ -283,7 +291,10 @@ describe('BookingService', () => {
       expect(result.refundStatus).toBe('COMPLETED');
       expect(prisma.booking.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { refundStatus: 'COMPLETED' },
+          data: {
+            refundStatus: 'COMPLETED',
+            paymentStatus: 'REFUNDED',
+          },
         }),
       );
     });

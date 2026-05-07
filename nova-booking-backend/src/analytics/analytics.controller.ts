@@ -20,6 +20,9 @@ export class AnalyticsController {
   ) {
     const userId = req.user.sub;
     const days = period ? parseInt(period, 10) : 7;
+    console.log(
+      `[AnalyticsController] Fetching analytics for user ${userId}, period: ${days} days`,
+    );
     return this.analyticsService.getAdminAnalytics(userId, days);
   }
 }
