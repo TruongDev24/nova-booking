@@ -1,0 +1,44 @@
+# Stage 1: Build
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache openssl
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build the application
+RUN npm run build
+
+# Stage 2: Production
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache openssl
+
+# Copy package files and install only production dependencies
+COPY package*.json ./
+RUN npm install --only=production
+
+# Copy built assets and prisma schema from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# Set environment variables
+ENV NODE_ENV=production
+
+EXPOSE 3001
+
+# Run migrations and start the app
+# Note: In a real production environment, you might want to run migrations 
+# as a separate step in CI/CD or using a dedicated migration job.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]

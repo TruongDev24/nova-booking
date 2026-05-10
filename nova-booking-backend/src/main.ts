@@ -21,8 +21,9 @@ async function bootstrap() {
   );
 
   // Bật CORS cho phép Frontend gọi API
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: isProduction ? [frontendUrl] : [frontendUrl, 'http://localhost:3000', 'http://127.0.0.1:3000'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });

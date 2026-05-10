@@ -43,7 +43,7 @@ import { NotificationModule } from './notification/notification.module';
           },
         },
         defaults: {
-          from: '"Nova Booking" <truongdaik90@gmail.com>',
+          from: `"Nova Booking" <${config.get('SMTP_USER')}>`,
         },
       }),
       inject: [ConfigService],

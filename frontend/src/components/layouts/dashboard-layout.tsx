@@ -49,6 +49,16 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {Separator} from "@/components/ui/separator";
 import {Input} from "@/components/ui/input";
 
@@ -77,6 +87,7 @@ export function DashboardLayout({
     roleDetail?: string
 }) {
     const [userData, setUserData] = React.useState<UserProfile | null>(null);
+    const [isLogoutOpen, setIsLogoutOpen] = React.useState(false);
     const pathname = usePathname();
     const router = useRouter();
 
@@ -98,7 +109,7 @@ export function DashboardLayout({
     const roleLabel = userData?.fullName || initialRoleLabel;
     const userEmail = userData?.email || "user@nova.com";
 
-    const handleLogout = () => {
+    const confirmLogout = () => {
         Cookies.remove("access_token");
         sessionStorage.clear();
         localStorage.removeItem("access_token");
@@ -151,7 +162,7 @@ export function DashboardLayout({
                 <SidebarFooter className="p-4 border-t">
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <SidebarMenuButton onClick={handleLogout}
+                            <SidebarMenuButton onClick={() => setIsLogoutOpen(true)}
                                                className="h-11 text-muted-foreground hover:text-destructive">
                                 <LogOut/>
                                 <span>Đăng xuất</span>
@@ -248,7 +259,7 @@ export function DashboardLayout({
                                     </DropdownMenuItem>
                                 </DropdownMenuGroup>
                                 <DropdownMenuSeparator/>
-                                <DropdownMenuItem onClick={handleLogout}
+                                <DropdownMenuItem onClick={() => setIsLogoutOpen(true)}
                                                   className="text-destructive focus:text-destructive">
                                     <LogOut className="mr-2 h-4 w-4"/>
                                     <span>Đăng xuất</span>
@@ -259,6 +270,26 @@ export function DashboardLayout({
                 </header>
                 <main className="p-6 md:p-10">{children}</main>
             </SidebarInset>
+
+            <AlertDialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Xác nhận đăng xuất</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Hủy</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmLogout}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Đăng xuất
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </SidebarProvider>
     );
 }
