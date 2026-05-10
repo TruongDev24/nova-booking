@@ -69,6 +69,7 @@ export class PaymentService {
 
     try {
       // 1. PayOS Signature Verification (Strict)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const verifiedData = (await this.payos.webhooks.verify(body as any)) as {
         orderCode: number;
         amount: number;

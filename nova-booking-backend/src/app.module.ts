@@ -21,7 +21,7 @@ import { NotificationModule } from './notification/notification.module';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
-        const redisUrl = config.get('REDIS_URL');
+        const redisUrl = config.get<string>('REDIS_URL');
         if (redisUrl) {
           return { connection: { url: redisUrl } };
         }
