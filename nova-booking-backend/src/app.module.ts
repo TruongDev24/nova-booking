@@ -40,21 +40,23 @@ import { NotificationModule } from './notification/notification.module';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
         const port = Number(config.get('SMTP_PORT')) || 587;
+        const service = config.get('SMTP_SERVICE'); // Add this to Render env
+        
         return {
           transport: {
-            host: config.get('SMTP_HOST'),
+            service: service === 'gmail' ? 'gmail' : undefined,
+            host: service === 'gmail' ? undefined : config.get('SMTP_HOST'),
             port: port,
-            secure: port === 465, // only true for 465, false for 587
+            secure: port === 465,
             auth: {
               user: config.get('SMTP_USER'),
               pass: config.get('SMTP_PASS'),
             },
             tls: {
-              // This is critical for cloud providers like Render/Vercel
               rejectUnauthorized: false,
             },
-            // Force IPv4 to avoid ENETUNREACH issues on Render
             family: 4,
+            connectionTimeout: 10000, // 10 seconds timeout
           },
           defaults: {
             from: `"Nova Booking" <${config.get('SMTP_USER')}>`,
