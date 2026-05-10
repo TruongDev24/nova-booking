@@ -54,13 +54,15 @@ export class BookingService {
     let lockedStartTimes: string[] = [];
     try {
       const lockPattern = `booking_lock:${courtId}:${date}:*`;
-      const lockedSlots = await this.redisService.getKeys(lockPattern);
+      // Use a timeout to prevent Redis latency from blocking the entire request
+      const lockedSlots = await Promise.race([
+        this.redisService.getKeys(lockPattern),
+        new Promise<string[]>((_, reject) => setTimeout(() => reject(new Error('Redis Timeout')), 2000))
+      ]);
       lockedStartTimes = lockedSlots.map((key) => key.split(':').pop() || '');
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(
-        'Failed to fetch Redis locks, continuing with DB data only:',
-        message,
+      this.logger.warn(
+        `Redis lock fetch failed or timed out: ${error instanceof Error ? error.message : 'Unknown error'}. Continuing with DB data only.`
       );
     }
 
@@ -210,53 +212,47 @@ export class BookingService {
     // 4. Secure Price Recalculation (The "1-Cent Hack" Fix)
     const calculatedTotalPrice = slots.length * court.pricePerHour;
 
-    // 5. Robust Redis Locking (All or Nothing)
+    // 5. Robust Redis Locking (Atomic Batch)
+    const lockRequests = slots.map((slotStartTime) => ({
+      key: `booking_lock:${courtId}:${bookingDate}:${slotStartTime}`,
+      value: userId,
+      ttl: 600, // 10 minutes
+    }));
+
+    let results: boolean[] = [];
+    try {
+      results = await this.redisService.multiSetnxWithExpire(lockRequests);
+    } catch (error) {
+      this.logger.error(`Redis multi-lock failure: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new ServiceUnavailableException('Hệ thống giữ chỗ đang bận, vui lòng thử lại sau');
+    }
+
     const acquiredLocks: string[] = [];
-    for (const slotStartTime of slots) {
-      const lockKey = `booking_lock:${courtId}:${bookingDate}:${slotStartTime}`;
-      let isAcquired = false;
-      try {
-        isAcquired = await this.redisService.setnxWithExpire(
-          lockKey,
-          userId,
-          600, // 10 minutes TTL
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(`Redis locking failure: ${message}`);
-        throw new ServiceUnavailableException(
-          'Hệ thống giữ chỗ đang bận, vui lòng thử lại sau',
-        );
+    const failedIndices: number[] = [];
+
+    results.forEach((isAcquired, index) => {
+      if (isAcquired) {
+        acquiredLocks.push(lockRequests[index].key);
+      } else {
+        failedIndices.push(index);
+      }
+    });
+
+    if (failedIndices.length > 0) {
+      // Rollback any locks that were acquired
+      if (acquiredLocks.length > 0) {
+        await Promise.all(acquiredLocks.map((key) => this.redisService.del(key)));
+        
+        const releasedSlots = acquiredLocks.map((l) => l.split(':').pop());
+        this.notificationGateway.emitToRoom(`room_court_${courtId}`, 'slots_released', {
+          bookingDate,
+          slots: releasedSlots,
+        });
       }
 
-      if (!isAcquired) {
-        // CRITICAL: Release all acquired locks if any single one fails
-        for (const key of acquiredLocks) {
-          try {
-            await this.redisService.del(key);
-          } catch {
-            // Silent catch on cleanup
-          }
-        }
-
-        // Trigger 3: Inventory Sync - Slots Released (Partial Rollback)
-        if (acquiredLocks.length > 0) {
-          const releasedSlots = acquiredLocks.map((l) => l.split(':').pop());
-          this.notificationGateway.emitToRoom(
-            `room_court_${courtId}`,
-            'slots_released',
-            {
-              bookingDate,
-              slots: releasedSlots,
-            },
-          );
-        }
-
-        throw new ConflictException(
-          'Sân đã có người đặt hoặc đang trong quá trình thanh toán. Vui lòng thử lại sau.',
-        );
-      }
-      acquiredLocks.push(lockKey);
+      throw new ConflictException(
+        'Một hoặc nhiều khung giờ đã có người đặt hoặc đang thanh toán. Vui lòng thử lại sau.',
+      );
     }
 
     // Trigger 2: Inventory Sync - Slots Locked

@@ -36,6 +36,18 @@ export class RedisService implements OnModuleDestroy {
     return result === 'OK';
   }
 
+  async multiSetnxWithExpire(
+    locks: Array<{ key: string; value: string; ttl: number }>,
+  ): Promise<boolean[]> {
+    const pipeline = this.redis.pipeline();
+    locks.forEach((lock) => {
+      pipeline.set(lock.key, lock.value, 'EX', lock.ttl, 'NX');
+    });
+    const results = await pipeline.exec();
+    if (!results) return locks.map(() => false);
+    return results.map(([err, res]) => !err && res === 'OK');
+  }
+
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
     if (ttlSeconds) {
       await this.redis.set(key, value, 'EX', ttlSeconds);

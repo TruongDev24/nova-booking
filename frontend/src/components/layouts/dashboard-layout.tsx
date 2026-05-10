@@ -117,12 +117,37 @@ export function DashboardLayout({
         router.push("/login");
     };
 
+    const [titleOverride, setTitleOverride] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        const handleUpdate = (e: any) => setTitleOverride(e.detail);
+        window.addEventListener("updateBreadcrumb", handleUpdate);
+        return () => {
+            window.removeEventListener("updateBreadcrumb", handleUpdate);
+            setTitleOverride(null);
+        };
+    }, [pathname]); // Reset when path changes
+
+    const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
     const breadcrumbs = pathname
         .split("/")
         .filter(Boolean)
         .map((segment, index, array) => {
             const href = "/" + array.slice(0, index + 1).join("/");
-            const label = segment.charAt(0).toUpperCase() + segment.slice(1);
+            let label = segment.charAt(0).toUpperCase() + segment.slice(1);
+            
+            // If segment is a UUID (like court ID), show override title or "Chi tiết"
+            if (isUUID(segment)) {
+                label = titleOverride || "Chi tiết";
+            } else if (label === "User") {
+                label = "Người dùng";
+            } else if (label === "Courts") {
+                label = "Sân bóng";
+            } else if (label === "Profile") {
+                label = "Hồ sơ";
+            }
+
             return {label, href, isLast: index === array.length - 1};
         });
 

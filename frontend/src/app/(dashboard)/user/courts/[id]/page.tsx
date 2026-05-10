@@ -58,6 +58,8 @@ export default function CourtDetailPage({params}: PageProps) {
                 setLoading(true);
                 const courtData = await courtService.getOne(id);
                 setCourt(courtData);
+                // Update breadcrumb title
+                window.dispatchEvent(new CustomEvent("updateBreadcrumb", { detail: courtData.name }));
                 await fetchSlots();
             } catch (error) {
                 console.error("Fetch Error:", error);
