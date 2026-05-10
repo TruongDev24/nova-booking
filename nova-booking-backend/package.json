@@ -58,7 +58,10 @@
     "typescript": "^5.7.3",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "ts-loader": "^9.5.2"
+    "ts-loader": "^9.5.2",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^24.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -66,10 +69,8 @@
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
     "@types/bcrypt": "^6.0.0",
-    "@types/express": "^5.0.0",
+    "@types/bcrypt": "^6.0.0",
     "@types/jest": "^30.0.0",
-    "@types/multer": "^2.1.0",
-    "@types/node": "^24.0.0",
     "@types/nodemailer": "^8.0.0",
     "@types/pg": "^8.20.0",
     "@types/streamifier": "^0.1.2",
