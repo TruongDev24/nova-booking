@@ -86,11 +86,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render Backend Deploy
-        run: curl -f -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}"
+        if: env.BACKEND_HOOK != ''
+        run: curl -f -X POST "${{ env.BACKEND_HOOK }}"
+        env:
+          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
           
-      - name: Trigger Render Frontend Deploy
-        run: curl -f -X POST "${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}"
-
       - name: Deployment Status
         run: |
-          echo "🚀 CI passed and Deployment triggered!"
+          echo "🚀 CI passed and Backend Deployment triggered (Vercel handles Frontend)!"
