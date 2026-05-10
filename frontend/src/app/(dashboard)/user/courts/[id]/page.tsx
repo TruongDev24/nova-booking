@@ -157,7 +157,7 @@ export default function CourtDetailPage({params}: PageProps) {
 
         // Safety Net: 15-second timeout for the entire booking flow
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("TIMEOUT")), 15000)
+            setTimeout(() => reject(new Error("TIMEOUT")), 30000)
         );
 
         try {
