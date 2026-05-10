@@ -20,32 +20,47 @@ import { NotificationModule } from './notification/notification.module';
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        connection: {
-          host: config.get('REDIS_HOST', 'localhost'),
-          port: config.get('REDIS_PORT', 6379),
-          password: config.get('REDIS_PASSWORD'),
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const redisUrl = config.get('REDIS_URL');
+        if (redisUrl) {
+          return { connection: { url: redisUrl } };
+        }
+        return {
+          connection: {
+            host: config.get('REDIS_HOST', 'localhost'),
+            port: config.get('REDIS_PORT', 6379),
+            password: config.get('REDIS_PASSWORD'),
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     RedisModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        transport: {
-          host: config.get('SMTP_HOST'),
-          port: Number(config.get('SMTP_PORT')) || 465,
-          secure: true, // port 465 requires secure: true
-          auth: {
-            user: config.get('SMTP_USER'),
-            pass: config.get('SMTP_PASS'),
+      useFactory: (config: ConfigService) => {
+        const port = Number(config.get('SMTP_PORT')) || 587;
+        return {
+          transport: {
+            host: config.get('SMTP_HOST'),
+            port: port,
+            secure: port === 465, // only true for 465, false for 587
+            auth: {
+              user: config.get('SMTP_USER'),
+              pass: config.get('SMTP_PASS'),
+            },
+            tls: {
+              // This is critical for cloud providers like Render/Vercel
+              rejectUnauthorized: false,
+            },
+            // Force IPv4 to avoid ENETUNREACH issues on Render
+            family: 4,
           },
-        },
-        defaults: {
-          from: `"Nova Booking" <${config.get('SMTP_USER')}>`,
-        },
-      }),
+          defaults: {
+            from: `"Nova Booking" <${config.get('SMTP_USER')}>`,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     PrismaModule,
