@@ -26,6 +26,10 @@ jobs:
         working-directory: ./nova-booking-backend
         run: npm ci
 
+      - name: Backend - Prisma generate
+        working-directory: ./nova-booking-backend
+        run: npx prisma generate
+
       - name: Backend - Lint
         working-directory: ./nova-booking-backend
         run: npm run lint
