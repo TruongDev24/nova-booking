@@ -56,7 +56,7 @@ export function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL(target, request.url));
         }
 
-    } catch (error) {
+    } catch {
         // If token is invalid/corrupted or expired, clear it and redirect to login
         const response = NextResponse.redirect(new URL('/login', request.url));
         response.cookies.delete('access_token');

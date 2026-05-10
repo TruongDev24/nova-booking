@@ -6,7 +6,6 @@ import {zodResolver} from "@hookform/resolvers/zod";
 import * as z from "zod";
 import axios from "axios";
 import {toast, Toaster} from "react-hot-toast";
-import {useRouter} from "next/navigation";
 import {
     Mail,
     Lock,

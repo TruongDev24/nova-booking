@@ -57,12 +57,14 @@ export class BookingService {
       // Use a timeout to prevent Redis latency from blocking the entire request
       const lockedSlots = await Promise.race([
         this.redisService.getKeys(lockPattern),
-        new Promise<string[]>((_, reject) => setTimeout(() => reject(new Error('Redis Timeout')), 2000))
+        new Promise<string[]>((_, reject) =>
+          setTimeout(() => reject(new Error('Redis Timeout')), 2000),
+        ),
       ]);
       lockedStartTimes = lockedSlots.map((key) => key.split(':').pop() || '');
     } catch (error) {
       this.logger.warn(
-        `Redis lock fetch failed or timed out: ${error instanceof Error ? error.message : 'Unknown error'}. Continuing with DB data only.`
+        `Redis lock fetch failed or timed out: ${error instanceof Error ? error.message : 'Unknown error'}. Continuing with DB data only.`,
       );
     }
 
@@ -223,8 +225,12 @@ export class BookingService {
     try {
       results = await this.redisService.multiSetnxWithExpire(lockRequests);
     } catch (error) {
-      this.logger.error(`Redis multi-lock failure: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      throw new ServiceUnavailableException('Hệ thống giữ chỗ đang bận, vui lòng thử lại sau');
+      this.logger.error(
+        `Redis multi-lock failure: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      throw new ServiceUnavailableException(
+        'Hệ thống giữ chỗ đang bận, vui lòng thử lại sau',
+      );
     }
 
     const acquiredLocks: string[] = [];
@@ -241,13 +247,19 @@ export class BookingService {
     if (failedIndices.length > 0) {
       // Rollback any locks that were acquired
       if (acquiredLocks.length > 0) {
-        await Promise.all(acquiredLocks.map((key) => this.redisService.del(key)));
-        
+        await Promise.all(
+          acquiredLocks.map((key) => this.redisService.del(key)),
+        );
+
         const releasedSlots = acquiredLocks.map((l) => l.split(':').pop());
-        this.notificationGateway.emitToRoom(`room_court_${courtId}`, 'slots_released', {
-          bookingDate,
-          slots: releasedSlots,
-        });
+        this.notificationGateway.emitToRoom(
+          `room_court_${courtId}`,
+          'slots_released',
+          {
+            bookingDate,
+            slots: releasedSlots,
+          },
+        );
       }
 
       throw new ConflictException(

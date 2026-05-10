@@ -120,7 +120,10 @@ export function DashboardLayout({
     const [titleOverride, setTitleOverride] = React.useState<string | null>(null);
 
     React.useEffect(() => {
-        const handleUpdate = (e: any) => setTitleOverride(e.detail);
+        const handleUpdate = (e: Event) => {
+            const customEvent = e as CustomEvent<string>;
+            setTitleOverride(customEvent.detail);
+        };
         window.addEventListener("updateBreadcrumb", handleUpdate);
         return () => {
             window.removeEventListener("updateBreadcrumb", handleUpdate);
