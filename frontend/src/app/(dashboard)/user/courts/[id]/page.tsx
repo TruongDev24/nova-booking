@@ -375,8 +375,10 @@ export default function CourtDetailPage({params}: PageProps) {
                                 Mô tả chi tiết
                             </h2>
                             <div className="prose prose-slate max-w-none">
-                                <p className="text-slate-600 leading-relaxed text-lg">
-                                    {court.description || "Sân cầu lông tiêu chuẩn quốc tế với hệ thống thảm chuyên dụng, ánh sáng chống chói và không gian thoáng đãng. Đây là địa điểm lý tưởng cho các trận đấu giao lưu cũng như tập luyện chuyên nghiệp."}
+                                <p className="text-slate-600 leading-relaxed text-lg whitespace-pre-wrap">
+                                    {court.description && court.description.trim() !== "" 
+                                        ? court.description 
+                                        : "Chủ sân chưa cung cấp mô tả chi tiết cho sân này. Vui lòng liên hệ trực tiếp hoặc đến trải nghiệm để biết thêm chi tiết."}
                                 </p>
                             </div>
                         </section>

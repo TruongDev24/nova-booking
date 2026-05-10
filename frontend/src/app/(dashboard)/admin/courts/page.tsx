@@ -331,7 +331,7 @@ export default function AdminCourtsPage() {
         formData.append("pricePerHour", Math.round(data.pricePerHour).toString());
         formData.append("openingTime", data.openingTime);
         formData.append("closingTime", data.closingTime);
-        if (data.description) formData.append("description", data.description.trim());
+        formData.append("description", (data.description || "").trim());
         if (data.amenities) formData.append("amenities", JSON.stringify(data.amenities));
         selectedFiles.forEach((file) => formData.append("images", file));
 
@@ -494,10 +494,12 @@ export default function AdminCourtsPage() {
                                 <div>
                                     <label
                                         className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Mô
-                                        tả ngắn</label>
-                                    <input
+                                        tả sân</label>
+                                    <textarea
                                         {...register("description")}
-                                        className="w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none focus:border-primary focus:bg-background font-bold text-sm transition-all"
+                                        rows={3}
+                                        className="w-full px-4 py-3 bg-muted/50 border rounded-xl outline-none focus:border-primary focus:bg-background font-bold text-sm transition-all resize-none"
+                                        placeholder="Nhập mô tả chi tiết về sân..."
                                     />
                                 </div>
 
