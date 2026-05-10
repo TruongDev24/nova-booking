@@ -40,8 +40,8 @@ import { NotificationModule } from './notification/notification.module';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
         const port = Number(config.get('SMTP_PORT')) || 587;
-        const service = config.get('SMTP_SERVICE'); // Add this to Render env
-        
+        const service = config.get<string>('SMTP_SERVICE'); // Add this to Render env
+
         return {
           transport: {
             service: service === 'gmail' ? 'gmail' : undefined,
