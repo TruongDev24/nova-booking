@@ -84,7 +84,7 @@ describe('BookingService', () => {
       // Mocks
       redisService.scard.mockResolvedValue(0); // 0 pending orders
       prisma.court.findUnique.mockResolvedValue(mockCourt);
-      redisService.setnxWithExpire.mockResolvedValue(true); // Lock success
+      redisService.multiSetnxWithExpire.mockResolvedValue([true, true]); // Lock success
       prisma.booking.findMany.mockResolvedValue([]); // No DB conflicts
       paymentService.generatePayosLink.mockResolvedValue({
         checkoutUrl: 'https://pay.os/checkout/123',
@@ -98,7 +98,7 @@ describe('BookingService', () => {
         'https://pay.os/checkout/123',
       );
       expect(redisService.scard).toHaveBeenCalled();
-      expect(redisService.setnxWithExpire).toHaveBeenCalledTimes(2); // 2 slots
+      expect(redisService.multiSetnxWithExpire).toHaveBeenCalled();
       expect(notificationGateway.emitToRoom).toHaveBeenCalled();
     });
 
@@ -128,23 +128,21 @@ describe('BookingService', () => {
       await expect(
         service.createMultiBooking(pastDto, mockUserId),
       ).rejects.toThrow(BadRequestException);
-      expect(redisService.setnxWithExpire).not.toHaveBeenCalled();
+      expect(redisService.multiSetnxWithExpire).not.toHaveBeenCalled();
     });
 
     it('4. Concurrency/Locks: Should rollback acquired locks if one fails', async () => {
       redisService.scard.mockResolvedValue(0);
       prisma.court.findUnique.mockResolvedValue(mockCourt);
 
-      // First slot succeeds, second fails
-      redisService.setnxWithExpire
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false);
+      // First slot succeeds, second fails in the batch
+      redisService.multiSetnxWithExpire.mockResolvedValue([true, false]);
 
       await expect(
         service.createMultiBooking(validDto, mockUserId),
       ).rejects.toThrow(ConflictException);
 
-      // Verify cleanup of the first acquired lock
+      // Verify cleanup of the first acquired lock (index 0)
       expect(redisService.del).toHaveBeenCalledWith(
         `booking_lock:${mockCourtId}:${validDto.bookingDate}:19:00`,
       );
@@ -170,7 +168,7 @@ describe('BookingService', () => {
     it('6. Concurrency: Should cleanup locks if DB check finds conflict after locking', async () => {
       redisService.scard.mockResolvedValue(0);
       prisma.court.findUnique.mockResolvedValue(mockCourt);
-      redisService.setnxWithExpire.mockResolvedValue(true);
+      redisService.multiSetnxWithExpire.mockResolvedValue([true, true]);
 
       // Simulate another booking found in DB
       prisma.booking.findMany.mockResolvedValue([{ id: 'existing' } as any]);

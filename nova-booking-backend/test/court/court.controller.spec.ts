@@ -80,6 +80,10 @@ describe('CourtController', () => {
     cloudinary = module.get<CloudinaryService>(CloudinaryService);
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe('1. Create & Update (Parsing & Exceptions)', () => {
     it('should create a court with correctly parsed price and amenities', async () => {
       const body = {
