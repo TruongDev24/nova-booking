@@ -54,9 +54,13 @@ import { NotificationModule } from './notification/notification.module';
             },
             tls: {
               rejectUnauthorized: false,
+              // Forced IPv4 for TLS as well
+              servername: service === 'gmail' ? 'smtp.gmail.com' : undefined,
             },
-            family: 4,
-            connectionTimeout: 10000, // 10 seconds timeout
+            family: 4, // Force IPv4
+            connectionTimeout: 15000, // 15 seconds
+            greetingTimeout: 15000,
+            socketTimeout: 15000,
           },
           defaults: {
             from: `"Nova Booking" <${config.get('SMTP_USER')}>`,
