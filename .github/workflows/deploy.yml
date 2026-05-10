@@ -82,14 +82,15 @@ jobs:
 
   deploy:
     needs: docker-build-check
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Deployment Instructions
+      - name: Trigger Render Backend Deploy
+        run: curl -f -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}"
+          
+      - name: Trigger Render Frontend Deploy
+        run: curl -f -X POST "${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}"
+
+      - name: Deployment Status
         run: |
-          echo "CI checks passed! Project is ready for production."
-          echo "For 100% Free Tier Deployment:"
-          echo "1. Frontend: Connect this repo to Vercel (Auto-deploys on push to main)."
-          echo "2. Backend: Connect this repo to Render (Use Dockerfile.prod, auto-deploys on push to main)."
-          echo "3. DB: Supabase PostgreSQL."
-          echo "4. Redis: Upstash Serverless Redis."
+          echo "🚀 CI passed and Deployment triggered!"
