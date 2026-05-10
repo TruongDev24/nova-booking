@@ -22,10 +22,14 @@ async function bootstrap() {
 
   // Bật CORS cho phép Frontend gọi API
   const isProduction = configService.get<string>('NODE_ENV') === 'production';
+  const allowedOrigins = [frontendUrl.replace(/\/$/, '')]; // Xóa dấu gạch chéo cuối nếu có
+
+  if (!isProduction) {
+    allowedOrigins.push('http://localhost:3000', 'http://127.0.0.1:3000');
+  }
+
   app.enableCors({
-    origin: isProduction
-      ? [frontendUrl]
-      : [frontendUrl, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });

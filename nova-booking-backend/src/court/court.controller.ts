@@ -46,22 +46,21 @@ export class CourtController {
           ? await this.cloudinaryService.uploadFiles(files)
           : [];
 
+      // Manual construction to handle FormData transformations (string -> number/array)
       const createCourtDto: CreateCourtDto = {
-        name: body.name || '',
-        location: body.location || '',
+        name: body.name ?? '',
+        location: body.location ?? '',
         description: body.description,
-        openingTime: body.openingTime || '',
-        closingTime: body.closingTime || '',
-        pricePerHour: body.pricePerHour ? parseFloat(body.pricePerHour) : 0,
+        openingTime: body.openingTime ?? '',
+        closingTime: body.closingTime ?? '',
+        pricePerHour: body.pricePerHour ? Number(body.pricePerHour) : 0,
         amenities: body.amenities
           ? (JSON.parse(body.amenities) as string[])
           : [],
+        images: imageUrls,
       };
 
-      return await this.courtService.create(
-        { ...createCourtDto, images: imageUrls },
-        userId,
-      );
+      return await this.courtService.create(createCourtDto, userId);
     } catch (error) {
       console.error('Court Create Error:', error);
       throw error;
@@ -101,20 +100,14 @@ export class CourtController {
         description: body.description,
         openingTime: body.openingTime,
         closingTime: body.closingTime,
-        pricePerHour: body.pricePerHour
-          ? parseFloat(body.pricePerHour)
-          : undefined,
+        pricePerHour: body.pricePerHour ? Number(body.pricePerHour) : undefined,
         amenities: body.amenities
           ? (JSON.parse(body.amenities) as string[])
           : undefined,
+        images: imageUrls.length > 0 ? imageUrls : undefined,
       };
 
-      const finalUpdateData = {
-        ...updateCourtDto,
-        ...(imageUrls.length > 0 && { images: imageUrls }),
-      };
-
-      return await this.courtService.update(id, finalUpdateData, userId);
+      return await this.courtService.update(id, updateCourtDto, userId);
     } catch (error) {
       console.error('Court Update Error:', error);
       throw error;

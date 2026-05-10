@@ -51,13 +51,12 @@ export default function BankProfilePage() {
         }
     }, [user]);
 
-    // 2. Fetch Banks from VietQR
+    // 2. Fetch Banks from Proxy (Backend) to avoid CORS
     const { data: banks, isLoading: isBanksLoading } = useQuery({
         queryKey: ["vietqr-banks"],
         queryFn: async () => {
-            const res = await fetch("https://api.vietqr.io/v2/banks");
-            const json = await res.json();
-            return json.data as VietQRBank[];
+            const response = await userService.getBanks();
+            return response.data as VietQRBank[];
         }
     });
 

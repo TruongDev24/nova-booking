@@ -23,5 +23,9 @@ export const userService = {
     getProfile: async (): Promise<User> => {
         const response = await apiClient.get("/auth/profile");
         return response.data;
+    },
+    getBanks: async () => {
+        const response = await apiClient.get("/users/banks");
+        return response.data;
     }
 };

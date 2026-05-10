@@ -33,7 +33,6 @@ export default function LoginPage() {
     const [isForgotMode, setIsForgotMode] = useState(false);
     const [forgotEmail, setForgotEmail] = useState("");
     const [isForgotLoading, setIsForgotLoading] = useState(false);
-    const router = useRouter();
 
     const {
         register,
@@ -64,7 +63,7 @@ export default function LoginPage() {
 
             setTimeout(() => {
                 if (user.role === "ADMIN") {
-                    router.push("/admin");
+                    window.location.href = "/admin";
                 } else {
                     // Step 4: Login Reminder for User
                     if (!user.bankAccountNumber) {
@@ -80,7 +79,7 @@ export default function LoginPage() {
                             },
                         });
                     }
-                    router.push("/user");
+                    window.location.href = "/user";
                 }
             }, 1500);
         } catch (error) {

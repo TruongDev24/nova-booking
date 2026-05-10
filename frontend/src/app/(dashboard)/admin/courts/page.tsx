@@ -328,7 +328,7 @@ export default function AdminCourtsPage() {
         const formData = new FormData();
         formData.append("name", data.name.trim());
         formData.append("location", data.location.trim());
-        formData.append("pricePerHour", data.pricePerHour.toString());
+        formData.append("pricePerHour", Math.round(data.pricePerHour).toString());
         formData.append("openingTime", data.openingTime);
         formData.append("closingTime", data.closingTime);
         if (data.description) formData.append("description", data.description.trim());
@@ -339,13 +339,13 @@ export default function AdminCourtsPage() {
             toast.promise(updateMutation.mutateAsync({id: editingCourt.id, formData}), {
                 loading: "Đang cập nhật thông tin sân...",
                 success: "Cập nhật sân thành công!",
-                error: "Lỗi khi cập nhật sân",
+                error: (err) => err?.response?.data?.message || "Lỗi khi cập nhật sân",
             });
         } else {
             toast.promise(createMutation.mutateAsync(formData), {
                 loading: "Đang tạo sân mới...",
                 success: "Thêm sân mới thành công!",
-                error: "Lỗi khi thêm sân mới",
+                error: (err) => err?.response?.data?.message || "Lỗi khi thêm sân mới",
             });
         }
     };

@@ -34,8 +34,8 @@ export function middleware(request: NextRequest) {
         // 3. Logic for Admin routes
         if (pathname.startsWith('/admin') && pathname !== '/admin/register') {
             if (userRole !== 'ADMIN') {
-                // Not an admin? Redirect to home or user dashboard
-                return NextResponse.redirect(new URL('/', request.url));
+                // Not an admin? Redirect to user dashboard
+                return NextResponse.redirect(new URL('/user', request.url));
             }
         }
 
@@ -52,12 +52,12 @@ export function middleware(request: NextRequest) {
 
         // 5. If already logged in, prevent accessing login/register pages
         if (token && (pathname === '/login' || pathname === '/register')) {
-            return NextResponse.redirect(new URL('/', request.url));
+            const target = userRole === 'ADMIN' ? '/admin' : '/user';
+            return NextResponse.redirect(new URL(target, request.url));
         }
 
     } catch (error) {
-        // If token is invalid/corrupted, clear it and redirect to login
-        console.error('Middleware JWT Error:', error);
+        // If token is invalid/corrupted or expired, clear it and redirect to login
         const response = NextResponse.redirect(new URL('/login', request.url));
         response.cookies.delete('access_token');
         return response;
