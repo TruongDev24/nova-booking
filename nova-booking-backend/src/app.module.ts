@@ -63,7 +63,7 @@ import { NotificationModule } from './notification/notification.module';
             socketTimeout: 15000,
           },
           defaults: {
-            from: `"Nova Booking" <${config.get('SMTP_USER')}>`,
+            from: config.get('SMTP_FROM') || `"Nova Booking" <${config.get('SMTP_USER')}>`,
           },
         };
       },
