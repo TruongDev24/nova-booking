@@ -15,7 +15,19 @@ apiClient.interceptors.request.use(
         }
         return config;
     },
-    (error) => {
+    (error) => Promise.reject(error)
+);
+
+apiClient.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        // Nếu lỗi 401 (Hết hạn hoặc không hợp lệ) -> Về login luôn (vì không dùng RT)
+        if (error.response?.status === 401) {
+            Cookies.remove('access_token');
+            if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                window.location.replace('/login');
+            }
+        }
         return Promise.reject(error);
     }
 );
