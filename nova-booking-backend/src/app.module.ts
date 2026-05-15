@@ -40,7 +40,9 @@ import { NotificationModule } from './notification/notification.module';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
         const service = config.get<string>('SMTP_SERVICE');
-        const port = Number(config.get('SMTP_PORT')) || (service === 'mailtrap' ? 2525 : 587);
+        const port =
+          Number(config.get('SMTP_PORT')) ||
+          (service === 'mailtrap' ? 2525 : 587);
 
         return {
           transport: {
@@ -55,7 +57,12 @@ import { NotificationModule } from './notification/notification.module';
             tls: {
               rejectUnauthorized: false,
               // Forced IPv4 for TLS as well
-              servername: service === 'gmail' ? 'smtp.gmail.com' : (service === 'mailtrap' ? 'sandbox.smtp.mailtrap.io' : undefined),
+              servername:
+                service === 'gmail'
+                  ? 'smtp.gmail.com'
+                  : service === 'mailtrap'
+                    ? 'sandbox.smtp.mailtrap.io'
+                    : undefined,
             },
             family: 4, // Force IPv4
             connectionTimeout: 15000, // 15 seconds
@@ -63,7 +70,9 @@ import { NotificationModule } from './notification/notification.module';
             socketTimeout: 15000,
           },
           defaults: {
-            from: config.get('SMTP_FROM') || `"Nova Booking" <${config.get('SMTP_USER')}>`,
+            from:
+              config.get('SMTP_FROM') ||
+              `"Nova Booking" <${config.get('SMTP_USER')}>`,
           },
         };
       },
