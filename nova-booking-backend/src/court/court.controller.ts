@@ -16,7 +16,7 @@ import { CreateCourtDto } from './dto/create-court.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';

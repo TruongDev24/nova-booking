@@ -15,6 +15,9 @@ import {
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaClient, Court } from '@prisma/client';
 import { NotificationGateway } from '../../src/notification/notification.gateway';
+import { getQueueToken } from '@nestjs/bullmq';
+import { BOOKING_EXPIRATION_QUEUE } from '../../src/booking/booking.constants';
+import { MailerService } from '@nestjs-modules/mailer';
 
 describe('BookingService', () => {
   let service: BookingService;
@@ -22,6 +25,13 @@ describe('BookingService', () => {
   let redisService: DeepMockProxy<RedisService>;
   let paymentService: DeepMockProxy<PaymentService>;
   let notificationGateway: DeepMockProxy<NotificationGateway>;
+  const expirationQueue = {
+    add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+    getJob: jest.fn().mockResolvedValue(null),
+  };
+  const mockMailerService = {
+    sendMail: jest.fn().mockResolvedValue({}),
+  };
 
   // FIXED_SYSTEM_TIME: 2026-04-25 10:00:00 UTC = 17:00:00 VN (GMT+7)
   const FIXED_SYSTEM_TIME = '2026-04-25T10:00:00.000Z';
@@ -44,6 +54,11 @@ describe('BookingService', () => {
         { provide: RedisService, useValue: redisService },
         { provide: PaymentService, useValue: paymentService },
         { provide: NotificationGateway, useValue: notificationGateway },
+        {
+          provide: getQueueToken(BOOKING_EXPIRATION_QUEUE),
+          useValue: expirationQueue,
+        },
+        { provide: MailerService, useValue: mockMailerService },
       ],
     }).compile();
 
@@ -86,6 +101,15 @@ describe('BookingService', () => {
       prisma.court.findUnique.mockResolvedValue(mockCourt);
       redisService.multiSetnxWithExpire.mockResolvedValue([true, true]); // Lock success
       prisma.booking.findMany.mockResolvedValue([]); // No DB conflicts
+      prisma.$transaction.mockImplementation(async (callback) => {
+        if (typeof callback === 'function') {
+          return callback(prisma);
+        }
+        return callback;
+      });
+      prisma.booking.create
+        .mockResolvedValueOnce({ id: 'booking-1' } as any)
+        .mockResolvedValueOnce({ id: 'booking-2' } as any);
       paymentService.generatePayosLink.mockResolvedValue({
         checkoutUrl: 'https://pay.os/checkout/123',
         orderCode: 123456789,
@@ -100,6 +124,8 @@ describe('BookingService', () => {
       expect(redisService.scard).toHaveBeenCalled();
       expect(redisService.multiSetnxWithExpire).toHaveBeenCalled();
       expect(notificationGateway.emitToRoom).toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(expirationQueue.add).toHaveBeenCalled();
     });
 
     it('2. Security (Anti-Spam): Should throw if user has >= 3 pending orders', async () => {
@@ -191,7 +217,8 @@ describe('BookingService', () => {
       startTime: '10:00',
       paymentStatus: 'PAID',
       status: 'CONFIRMED',
-      court: { id: mockCourtId },
+      court: { id: mockCourtId, name: 'Test Court' },
+      user: { email: 'test@example.com', fullName: 'Test User' },
     };
 
     it('1. 12-Hour Rule: Should throw BadRequestException if cancelled < 12h before play', async () => {
@@ -237,16 +264,14 @@ describe('BookingService', () => {
         refundStatus: 'PENDING',
       } as any);
 
-      await service.cancelBooking('booking-id', mockUserId);
+      const result = await service.cancelBooking('booking-id', mockUserId);
 
-      expect(prisma.booking.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: {
-            status: 'CANCELLED',
-            refundStatus: 'PENDING',
-          },
-        }),
-      );
+      expect(result).toEqual({ success: true, cancelledCount: 1 });
+
+      const expectedLockKey = `booking_lock:${mockBooking.courtId}:${mockBooking.bookingDate}:${mockBooking.startTime}`;
+      expect(redisService.del).toHaveBeenCalledWith(expectedLockKey);
+
+      expect(prisma.booking.updateMany).toHaveBeenCalled();
     });
   });
 

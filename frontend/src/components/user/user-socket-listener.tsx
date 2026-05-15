@@ -1,7 +1,7 @@
 "use client";
 
 import {useEffect} from "react";
-import {useSocket} from "@/hooks/useSocket";
+import {useSocket} from "@/hooks/use-socket";
 import {toast} from "sonner";
 import {useRouter} from "next/navigation";
 import {useQueryClient} from "@tanstack/react-query";

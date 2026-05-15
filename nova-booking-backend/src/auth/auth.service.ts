@@ -19,6 +19,7 @@ import { AdminRegisterDto } from './dto/admin-register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Role } from '@prisma/client';
 import { UserPayload } from '../common/interfaces/user-payload.interface';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +28,7 @@ export class AuthService {
     private jwtService: JwtService,
     private mailerService: MailerService,
     private configService: ConfigService,
+    private prisma: PrismaService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -49,7 +51,7 @@ export class AuthService {
       phone: registerDto.phone,
       avatar: registerDto.avatar,
       password: hashedPassword,
-      role: Role.USER, // Hardcode role to USER for public registration
+      role: Role.USER,
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -59,7 +61,7 @@ export class AuthService {
 
   async registerAdmin(dto: AdminRegisterDto) {
     if (dto.secretKey !== this.configService.get('ADMIN_REGISTRATION_SECRET')) {
-      throw new UnauthorizedException('Invalid admin secret key');
+      throw new UnauthorizedException('Khóa bí mật quản trị viên không hợp lệ');
     }
 
     const existingUser = await this.usersService.findByEmailOrPhone(
@@ -67,7 +69,7 @@ export class AuthService {
       dto.phone,
     );
     if (existingUser) {
-      throw new ConflictException('User already exists');
+      throw new ConflictException('Người dùng đã tồn tại');
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -90,12 +92,12 @@ export class AuthService {
   async validateUser(loginDto: LoginDto) {
     const user = await this.usersService.findByEmail(loginDto.email);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
     }
 
     const isMatch = await bcrypt.compare(loginDto.password, user.password);
     if (!isMatch) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -103,15 +105,31 @@ export class AuthService {
     return result;
   }
 
-  login(user: { id: string; email: string; role: Role; fullName: string }) {
+  async login(
+    user: { id: string; email: string; role: Role; fullName: string },
+    deviceInfo?: string,
+  ) {
     const payload: UserPayload = {
       email: user.email,
       sub: user.id,
       role: user.role,
       fullName: user.fullName,
     };
+
+    const tokens = await this.generateTokens(payload);
+
+    // Save refresh token to DB (Multi-device support)
+    await this.prisma.refreshToken.create({
+      data: {
+        token: this.hashToken(tokens.refresh_token),
+        userId: user.id,
+        device: deviceInfo,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+    });
+
     return {
-      access_token: this.jwtService.sign(payload),
+      ...tokens,
       user: {
         id: user.id,
         email: user.email,
@@ -119,6 +137,81 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+  async refreshTokens(refreshToken: string, deviceInfo?: string) {
+    const hashedToken = this.hashToken(refreshToken);
+    const tokenData = await this.prisma.refreshToken.findUnique({
+      where: { token: hashedToken },
+      include: { user: true },
+    });
+
+    if (!tokenData || tokenData.expiresAt < new Date()) {
+      // If token exists but expired, clean it up
+      if (tokenData) {
+        await this.prisma.refreshToken.delete({ where: { id: tokenData.id } });
+      }
+      throw new UnauthorizedException(
+        'Refresh token đã hết hạn hoặc không hợp lệ',
+      );
+    }
+
+    const payload: UserPayload = {
+      email: tokenData.user.email,
+      sub: tokenData.user.id,
+      role: tokenData.user.role,
+      fullName: tokenData.user.fullName,
+    };
+
+    const tokens = await this.generateTokens(payload);
+
+    // RT Rotation: Delete old token and save new one
+    await this.prisma.refreshToken.delete({ where: { id: tokenData.id } });
+    await this.prisma.refreshToken.create({
+      data: {
+        token: this.hashToken(tokens.refresh_token),
+        userId: tokenData.user.id,
+        device: deviceInfo,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    return tokens;
+  }
+
+  async logout(refreshToken: string) {
+    const hashedToken = this.hashToken(refreshToken);
+    try {
+      await this.prisma.refreshToken.delete({
+        where: { token: hashedToken },
+      });
+    } catch {
+      // Ignore if token not found
+    }
+    return { message: 'Logged out successfully' };
+  }
+
+  private async generateTokens(payload: UserPayload) {
+    const [at, rt] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        expiresIn: '15m', // Access Token ngắn hạn
+        secret: this.configService.get('JWT_SECRET'),
+      }),
+      this.jwtService.signAsync(payload, {
+        expiresIn: '7d', // Refresh Token dài hạn
+        secret:
+          this.configService.get('JWT_REFRESH_SECRET') || 'refresh-secret',
+      }),
+    ]);
+
+    return {
+      access_token: at,
+      refresh_token: rt,
+    };
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto) {

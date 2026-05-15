@@ -59,6 +59,12 @@ services:
     networks:
       - nova-network
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/api || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
@@ -73,8 +79,13 @@ services:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+    environment:
+      # Nếu Next.js có chạy SSR (Server Side Rendering), dùng 'backend' thay vì 'localhost'
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - BACKEND_INTERNAL_URL=http://backend:3001
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy # Đảm bảo backend sẵn sàng trước khi start frontend
     networks:
       - nova-network
     restart: always

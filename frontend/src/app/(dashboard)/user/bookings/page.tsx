@@ -16,7 +16,8 @@ import {
 import {bookingService} from "@/services/booking.service";
 import {paymentService} from "@/services/payment.service";
 import {toast, Toaster} from "react-hot-toast";
-import {formatToVietnamDate} from "@/utils/date-format";
+import {formatToVietnamDate} from "@/lib/date-format";
+import {useRouter} from "next/navigation";
 import Image from "next/image";
 import {ReviewDialog} from "@/components/reviews/ReviewDialog";
 import {userService, User} from "@/services/user.service";
@@ -30,6 +31,8 @@ interface Booking {
     totalPrice: number;
     status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
     paymentStatus: "UNPAID" | "PARTIAL_PAID" | "PAID" | "REFUNDED";
+    payosOrderCode?: string | null;
+    cancelReason?: string | null;
     court: {
         name: string;
         location: string;
@@ -44,6 +47,7 @@ interface Booking {
 }
 
 export default function MyBookingsPage() {
+    const router = useRouter();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [userProfile, setUserProfile] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -273,7 +277,7 @@ export default function MyBookingsPage() {
                                                                 <span>Cần cập nhật thông tin ngân hàng để nhận hoàn tiền trước khi hủy.</span>
                                                             </div>
                                                             <button 
-                                                                onClick={() => window.location.href = "/user/profile/bank"}
+                                                                onClick={() => router.push("/user/profile/bank")}
                                                                 className="text-[11px] font-black uppercase text-amber-600 hover:text-amber-700 underline underline-offset-4"
                                                             >
                                                                 Cập nhật ngay
@@ -335,8 +339,15 @@ export default function MyBookingsPage() {
                                         )}
 
                                         {booking.status === "CANCELLED" && (
-                                            <div className="text-rose-400 italic text-sm font-medium">
-                                                Đã hủy
+                                            <div className="flex flex-col items-end">
+                                                <div className="text-rose-400 italic text-sm font-medium">
+                                                    Đã hủy
+                                                </div>
+                                                {booking.cancelReason && (
+                                                    <div className="text-[10px] text-slate-400 mt-1 max-w-[200px] text-right">
+                                                        Lý do: {booking.cancelReason}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>

@@ -30,7 +30,7 @@ export default function RootDashboardLayout({
         <DashboardLayout
             menuItems={isAdmin ? adminMenuItems : userMenuItems}
             roleLabel={isAdmin ? "Chủ sân" : "Khách hàng"}
-            roleDetail={isAdmin ? "Manager" : "Customer"}
+            roleDetail={isAdmin ? "Quản lý" : "Thành viên"}
         >
             {children}
         </DashboardLayout>

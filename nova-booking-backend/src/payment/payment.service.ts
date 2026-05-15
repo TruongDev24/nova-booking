@@ -55,8 +55,8 @@ export class PaymentService {
       const paymentLinkResponse = await this.payos.paymentRequests.create(body);
       return paymentLinkResponse;
     } catch (error) {
-      this.logger.error('PayOS Create Error:', error);
-      throw new BadRequestException('Could not create payment link');
+      this.logger.error('Lỗi khi tạo PayOS:', error);
+      throw new BadRequestException('Không thể tạo liên kết thanh toán');
     }
   }
 
@@ -108,7 +108,11 @@ export class PaymentService {
           where: { payosOrderCode: BigInt(orderCode) },
         });
 
-        if (existingBooking) {
+        if (
+          existingBooking &&
+          (existingBooking.status === 'CONFIRMED' ||
+            existingBooking.paymentStatus === 'PAID')
+        ) {
           this.logger.log(
             `Order ${orderCode} already fulfilled in database. Skipping.`,
           );
@@ -144,7 +148,56 @@ export class PaymentService {
         );
         await this.prisma.$transaction(async (tx) => {
           const pricePerSlot = totalPrice / slots.length;
+          const payosCode = BigInt(orderCode);
 
+          const pendingBookings = await tx.booking.findMany({
+            where: {
+              payosOrderCode: payosCode,
+              status: 'PENDING',
+            },
+          });
+
+          if (pendingBookings.length > 0) {
+            if (pendingBookings.length !== slots.length) {
+              throw new Error(
+                `PENDING booking count mismatch for order ${orderCode}. Expected ${slots.length}, got ${pendingBookings.length}`,
+              );
+            }
+
+            for (const slot of slots) {
+              const booking = pendingBookings.find(
+                (b) => b.startTime === slot.startTime,
+              );
+              if (!booking) {
+                throw new Error(
+                  `Missing PENDING booking for slot ${slot.startTime}, order ${orderCode}`,
+                );
+              }
+
+              await tx.booking.update({
+                where: { id: booking.id },
+                data: {
+                  status: 'CONFIRMED',
+                  paymentStatus: 'PAID',
+                  expiresAt: null,
+                },
+              });
+
+              await tx.payment.create({
+                data: {
+                  bookingId: booking.id,
+                  userId,
+                  amount: pricePerSlot,
+                  method: 'BANK_TRANSFER',
+                  status: 'PAID',
+                  transactionId: String(verifiedData.paymentLinkId),
+                },
+              });
+            }
+            return;
+          }
+
+          // Fallback: legacy orders without PENDING rows (pre-migration clients)
           for (const slot of slots) {
             const booking = await tx.booking.create({
               data: {
@@ -156,14 +209,14 @@ export class PaymentService {
                 totalPrice: pricePerSlot,
                 status: 'CONFIRMED',
                 paymentStatus: 'PAID',
-                payosOrderCode: BigInt(orderCode),
+                payosOrderCode: payosCode,
               },
             });
 
             await tx.payment.create({
               data: {
                 bookingId: booking.id,
-                userId: userId,
+                userId,
                 amount: pricePerSlot,
                 method: 'BANK_TRANSFER',
                 status: 'PAID',

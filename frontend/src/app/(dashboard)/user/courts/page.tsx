@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Search, ArrowLeft, ArrowRight, Image as ImageIcon } from "lucide-react";
 import { courtService, PaginatedCourts, Court } from "@/services/court.service";
 import Link from "next/link";
-import { CourtCard } from "@/components/ui/court-card";
+import { CourtCard } from "@/components/courts/court-card";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 

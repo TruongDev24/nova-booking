@@ -20,7 +20,7 @@ import {bookingService, TimeSlot, CreateBookingResponse} from "@/services/bookin
 import {toast, Toaster} from "react-hot-toast";
 import {useRouter} from "next/navigation";
 import Image from "next/image";
-import {useSocket} from "@/hooks/useSocket";
+import {useSocket} from "@/hooks/use-socket";
 
 interface PageProps {
     params: Promise<{ id: string }>;

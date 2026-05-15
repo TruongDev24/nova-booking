@@ -61,6 +61,21 @@ model User {
   payments Payment[]
   reviews  Review[]
   courts   Court[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique // Hashed token
+  userId    String
+  device    String?  // Optional: info about the device/browser
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
 }
 
 model Court {
@@ -107,7 +122,7 @@ model Booking {
   payment Payment?
   review  Review?
 
-  @@unique([courtId, bookingDate, startTime])
+  @@index([courtId, bookingDate, startTime])
   @@index([bookingDate])
   @@index([courtId, status])
   @@index([status, bookingDate])

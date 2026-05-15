@@ -1,4 +1,4 @@
-import apiClient from './apiClient';
+import apiClient from '@/services/apiClient';
 
 export interface PaymentLinkResponse {
     bin: string;

@@ -1,6 +1,6 @@
 import { Controller, Logger, Post, Req, Res } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { Public } from '../auth/decorators/public.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import * as express from 'express';
 
 @Controller('payment')

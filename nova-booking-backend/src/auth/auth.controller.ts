@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   UseGuards,
+  Headers,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -15,7 +16,7 @@ import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { Public } from './decorators/public.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from '../common/decorators/get-user.decorator';
 
@@ -38,9 +39,29 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Body() loginDto: LoginDto) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Headers('user-agent') userAgent: string,
+  ) {
     const user = await this.authService.validateUser(loginDto);
-    return this.authService.login(user);
+    return this.authService.login(user, userAgent);
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh')
+  async refresh(
+    @Body('refresh_token') refreshToken: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.authService.refreshTokens(refreshToken, userAgent);
+  }
+
+  @Public() // Logout needs the RT to be deleted from DB, even if AT is expired
+  @HttpCode(HttpStatus.OK)
+  @Post('logout')
+  async logout(@Body('refresh_token') refreshToken: string) {
+    return this.authService.logout(refreshToken);
   }
 
   @UseGuards(JwtAuthGuard)

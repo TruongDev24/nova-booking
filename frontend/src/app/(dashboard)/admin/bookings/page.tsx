@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 import { bookingService, Booking } from "@/services/booking.service";
 import { toast } from "sonner";
-import { formatToVietnamDate } from "@/utils/date-format";
+import { formatToVietnamDate } from "@/lib/date-format";
 import { ColumnDef } from "@tanstack/react-table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { DataTable } from "@/components/ui/data-table";
+import { DataTable } from "@/components/data-table/data-table";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -223,6 +223,17 @@ export default function AdminBookingsPage() {
                     </div>
                 );
             },
+        },
+        {
+            id: "reason",
+            header: "Lý do",
+            cell: ({ row }) => (
+                <div className="max-w-[150px]">
+                    <span className="text-[11px] text-muted-foreground italic font-medium">
+                        {row.original.cancelReason || ""}
+                    </span>
+                </div>
+            ),
         },
         {
             id: "actions",

@@ -1,4 +1,4 @@
-import {AdminSocketListener} from "./components/AdminSocketListener";
+import {AdminSocketListener} from "@/components/admin/admin-socket-listener";
 
 export default function AdminLayout({
                                         children,

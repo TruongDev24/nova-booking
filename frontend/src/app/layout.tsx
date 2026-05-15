@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 import {TooltipProvider} from "@/components/ui/tooltip";
 import {Toaster} from "@/components/ui/sonner";
 import QueryProvider from "@/components/providers/query-provider";
-import {SocketProvider} from "@/hooks/useSocket";
+import {SocketProvider} from "@/components/providers/socket-provider";
 
 export default function RootLayout({
                                        children,

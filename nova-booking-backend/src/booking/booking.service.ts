@@ -7,13 +7,22 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
-import { BookingStatus, Prisma, RefundStatus } from '@prisma/client';
+import { Booking, BookingStatus, Prisma, RefundStatus } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { RedisService } from '../redis/redis.service';
 import { PaymentService } from '../payment/payment.service';
 import { NotificationGateway } from '../notification/notification.gateway';
+import {
+  BOOKING_CHECKOUT_TTL_MS,
+  BOOKING_EXPIRATION_JOB,
+  BOOKING_EXPIRATION_QUEUE,
+} from './booking.constants';
+import { BookingExpirationJobData } from './interfaces/booking-expiration-job.interface';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class BookingService {
@@ -24,6 +33,9 @@ export class BookingService {
     private redisService: RedisService,
     private paymentService: PaymentService,
     private notificationGateway: NotificationGateway,
+    @InjectQueue(BOOKING_EXPIRATION_QUEUE)
+    private expirationQueue: Queue<BookingExpirationJobData>,
+    private mailerService: MailerService,
   ) {}
 
   async getDailySlots(courtId: string, date: string) {
@@ -42,10 +54,19 @@ export class BookingService {
     const closeHour = parseInt(courtClose.split(':')[0], 10);
     const is24Hours = courtOpen === '00:00' && courtClose === '00:00';
 
+    const dateParts = date.split('-').map(Number);
+    if (dateParts.some(isNaN) || dateParts.length < 3) {
+      throw new BadRequestException(
+        'Định dạng ngày không hợp lệ (YYYY-MM-DD).',
+      );
+    }
+    const [year, month, day] = dateParts;
+    const normalizedDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+
     const existingBookings = await this.prisma.booking.findMany({
       where: {
         courtId,
-        bookingDate: date,
+        bookingDate: normalizedDate,
         status: { not: BookingStatus.CANCELLED },
       },
     });
@@ -53,7 +74,7 @@ export class BookingService {
     // Get active locks from Redis (Pending payments)
     let lockedStartTimes: string[] = [];
     try {
-      const lockPattern = `booking_lock:${courtId}:${date}:*`;
+      const lockPattern = `booking_lock:${courtId}:${normalizedDate}:*`;
       // Use a timeout to prevent Redis latency from blocking the entire request
       const lockedSlots = await Promise.race([
         this.redisService.getKeys(lockPattern),
@@ -61,7 +82,17 @@ export class BookingService {
           setTimeout(() => reject(new Error('Redis Timeout')), 2000),
         ),
       ]);
-      lockedStartTimes = lockedSlots.map((key) => key.split(':').pop() || '');
+      lockedStartTimes = lockedSlots
+        .map((key) => {
+          const parts = key.split(':');
+          // Format is booking_lock:courtId:date:HH:mm
+          // So HH is at index 3 and mm is at index 4
+          if (parts.length >= 5) {
+            return `${parts[3]}:${parts[4]}`;
+          }
+          return '';
+        })
+        .filter(Boolean);
     } catch (error) {
       this.logger.warn(
         `Redis lock fetch failed or timed out: ${error instanceof Error ? error.message : 'Unknown error'}. Continuing with DB data only.`,
@@ -169,7 +200,14 @@ export class BookingService {
     if (cClose <= cOpen) cClose += 24;
 
     const now = new Date();
-    const [year, month, day] = bookingDate.split('-').map(Number);
+    const dateParts = bookingDate.split('-').map(Number);
+    if (dateParts.some(isNaN) || dateParts.length < 3) {
+      throw new BadRequestException(
+        'Định dạng ngày không hợp lệ (YYYY-MM-DD).',
+      );
+    }
+    const [year, month, day] = dateParts;
+    const normalizedDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
     const VN_UTC_OFFSET_HOURS = 7;
 
     const normalizedSlots: Array<{ startTime: string; endTime: string }> = [];
@@ -216,7 +254,7 @@ export class BookingService {
 
     // 5. Robust Redis Locking (Atomic Batch)
     const lockRequests = slots.map((slotStartTime) => ({
-      key: `booking_lock:${courtId}:${bookingDate}:${slotStartTime}`,
+      key: `booking_lock:${courtId}:${normalizedDate}:${slotStartTime}`,
       value: userId,
       ttl: 600, // 10 minutes
     }));
@@ -251,12 +289,17 @@ export class BookingService {
           acquiredLocks.map((key) => this.redisService.del(key)),
         );
 
-        const releasedSlots = acquiredLocks.map((l) => l.split(':').pop());
+        const releasedSlots = acquiredLocks
+          .map((l) => {
+            const parts = l.split(':');
+            return parts.length >= 5 ? `${parts[3]}:${parts[4]}` : '';
+          })
+          .filter(Boolean);
         this.notificationGateway.emitToRoom(
           `room_court_${courtId}`,
           'slots_released',
           {
-            bookingDate,
+            bookingDate: normalizedDate,
             slots: releasedSlots,
           },
         );
@@ -272,7 +315,7 @@ export class BookingService {
       `room_court_${courtId}`,
       'slots_locked',
       {
-        bookingDate,
+        bookingDate: normalizedDate,
         slots: slots,
       },
     );
@@ -281,7 +324,7 @@ export class BookingService {
     const existing = await this.prisma.booking.findMany({
       where: {
         courtId,
-        bookingDate,
+        bookingDate: normalizedDate,
         startTime: { in: slots },
         status: { not: BookingStatus.CANCELLED },
       },
@@ -295,15 +338,41 @@ export class BookingService {
       );
     }
 
-    // 6. Save Temp Order & Register User Lock
+    // 6. PENDING bookings + temp order + delayed expiration job
     const orderCode = Math.floor(Math.random() * 9007199254740991);
+    const expiresAt = new Date(Date.now() + BOOKING_CHECKOUT_TTL_MS);
+    const pricePerSlot = calculatedTotalPrice / normalizedSlots.length;
+    const checkoutTtlSeconds = BOOKING_CHECKOUT_TTL_MS / 1000;
+    let bookingIds: string[] = [];
 
     try {
+      const pendingBookings = await this.prisma.$transaction(async (tx) => {
+        const created: Booking[] = [];
+        for (const slot of normalizedSlots) {
+          const booking = await tx.booking.create({
+            data: {
+              userId,
+              courtId,
+              bookingDate: normalizedDate,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              totalPrice: pricePerSlot,
+              status: BookingStatus.PENDING,
+              payosOrderCode: BigInt(orderCode),
+              expiresAt,
+            },
+          });
+          created.push(booking);
+        }
+        return created;
+      });
+      bookingIds = pendingBookings.map((b) => b.id);
+
       const payload = {
         userId,
         courtId,
         courtName: court.name,
-        bookingDate,
+        bookingDate: normalizedDate,
         slots: normalizedSlots,
         totalPrice: calculatedTotalPrice,
       };
@@ -311,12 +380,30 @@ export class BookingService {
       await this.redisService.set(
         `temp_order:${orderCode}`,
         JSON.stringify(payload),
-        600, // 10 minutes TTL
+        checkoutTtlSeconds,
       );
 
-      // Add to user's pending set
       await this.redisService.sadd(pendingOrdersKey, orderCode.toString());
-      await this.redisService.expire(pendingOrdersKey, 600);
+      await this.redisService.expire(pendingOrdersKey, checkoutTtlSeconds);
+
+      await this.expirationQueue.add(
+        BOOKING_EXPIRATION_JOB,
+        {
+          bookingIds,
+          orderCode,
+          userId,
+          courtId,
+          courtName: court.name,
+          bookingDate: normalizedDate,
+          slots: normalizedSlots.map((s) => s.startTime),
+        },
+        {
+          delay: BOOKING_CHECKOUT_TTL_MS,
+          jobId: `expire-order-${orderCode}`,
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      );
 
       // 7. PayOS Link Generation
       const description = `Thanh toan ${slots.length} ca san`.slice(0, 25);
@@ -331,11 +418,43 @@ export class BookingService {
         checkoutUrl: paymentLink.checkoutUrl,
       };
     } catch (error) {
-      // Cleanup on failure
-      for (const key of acquiredLocks) await this.redisService.del(key);
-      await this.redisService.srem(pendingOrdersKey, orderCode.toString());
+      await this.cleanupPendingCheckout(
+        bookingIds,
+        orderCode,
+        acquiredLocks,
+        pendingOrdersKey,
+      );
       this.logger.error(`Booking creation failed for user ${userId}:`, error);
       throw error;
+    }
+  }
+
+  private async cleanupPendingCheckout(
+    bookingIds: string[],
+    orderCode: number,
+    acquiredLocks: string[],
+    pendingOrdersKey: string,
+  ) {
+    if (bookingIds.length > 0) {
+      await this.prisma.booking.deleteMany({
+        where: {
+          id: { in: bookingIds },
+          status: BookingStatus.PENDING,
+        },
+      });
+    }
+    for (const key of acquiredLocks) {
+      await this.redisService.del(key);
+    }
+    await this.redisService.del(`temp_order:${orderCode}`);
+    await this.redisService.srem(pendingOrdersKey, orderCode.toString());
+    try {
+      const job = await this.expirationQueue.getJob(
+        `expire-order-${orderCode}`,
+      );
+      if (job) await job.remove();
+    } catch {
+      // Job may not exist if failure happened before enqueue
     }
   }
 
@@ -355,7 +474,7 @@ export class BookingService {
   async cancelBooking(id: string, userId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
-      include: { court: true },
+      include: { court: true, user: true },
     });
 
     if (!booking) {
@@ -366,69 +485,110 @@ export class BookingService {
       throw new ForbiddenException('Bạn không có quyền hủy lịch này');
     }
 
-    // Only PAID bookings can be cancelled by user
-    if (booking.paymentStatus !== 'PAID') {
-      throw new BadRequestException(
-        'Chỉ có thể hủy những lịch đã thanh toán thành công.',
-      );
-    }
-
     if (booking.status === BookingStatus.CANCELLED) {
       throw new BadRequestException('Lịch này đã được hủy trước đó');
     }
 
-    // --- NEW: Hard Lock - Must have bank info to cancel PAID booking ---
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { bankAccountNumber: true, bankName: true },
-    });
+    // Allow cancellation for PENDING or PAID (Confirmed)
+    const isPaid = booking.paymentStatus === 'PAID';
+    const isPending = booking.status === BookingStatus.PENDING;
 
-    if (!user?.bankAccountNumber || !user?.bankName) {
+    if (!isPending && !isPaid) {
       throw new BadRequestException(
-        'Vui lòng cập nhật thông tin ngân hàng trong trang Cá nhân trước khi thực hiện hủy đơn để chúng tôi có thể hoàn tiền cho bạn.',
+        'Chỉ có thể hủy đơn đang chờ thanh toán hoặc đã thanh toán thành công.',
       );
     }
 
-    // 12-hour cancellation policy
-    const [year, month, day] = booking.bookingDate.split('-').map(Number);
-    const [hour, minute] = booking.startTime.split(':').map(Number);
-    const VN_UTC_OFFSET_HOURS = 7;
+    // Additional checks for PAID bookings (cancellation policy)
+    if (isPaid) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { bankAccountNumber: true, bankName: true },
+      });
 
-    const playTimeMs = Date.UTC(
-      year,
-      month - 1,
-      day,
-      hour - VN_UTC_OFFSET_HOURS,
-      minute,
-      0,
-      0,
-    );
+      if (!user?.bankAccountNumber || !user?.bankName) {
+        throw new BadRequestException(
+          'Vui lòng cập nhật thông tin ngân hàng trong trang Cá nhân trước khi thực hiện hủy đơn để chúng tôi có thể hoàn tiền cho bạn.',
+        );
+      }
 
-    const hoursDiff = (playTimeMs - Date.now()) / (1000 * 60 * 60);
-    if (hoursDiff < 12) {
-      throw new BadRequestException(
-        'Không thể hủy lịch trong vòng 12 giờ trước giờ bắt đầu chơi.',
+      // 12-hour cancellation policy
+      const [year, month, day] = booking.bookingDate.split('-').map(Number);
+      const [hour, minute] = booking.startTime.split(':').map(Number);
+      const VN_UTC_OFFSET_HOURS = 7;
+
+      const playTimeMs = Date.UTC(
+        year,
+        month - 1,
+        day,
+        hour - VN_UTC_OFFSET_HOURS,
+        minute,
+        0,
+        0,
       );
+
+      const hoursDiff = (playTimeMs - Date.now()) / (1000 * 60 * 60);
+      if (hoursDiff < 12) {
+        throw new BadRequestException(
+          'Không thể hủy lịch trong vòng 12 giờ trước giờ bắt đầu chơi.',
+        );
+      }
     }
 
-    const updatedBooking = await this.prisma.booking.update({
-      where: { id },
+    // --- BATCH CANCELLATION FOR PENDING ORDERS ---
+    let bookingsToCancel = [booking];
+    if (isPending && booking.payosOrderCode) {
+      bookingsToCancel = await this.prisma.booking.findMany({
+        where: {
+          payosOrderCode: booking.payosOrderCode,
+          status: BookingStatus.PENDING,
+        },
+        include: { court: true, user: true },
+      });
+    }
+
+    const bookingIds = bookingsToCancel.map((b) => b.id);
+
+    await this.prisma.booking.updateMany({
+      where: { id: { in: bookingIds } },
       data: {
         status: BookingStatus.CANCELLED,
-        refundStatus: 'PENDING', // Initialize refund workflow
+        cancelReason: isPending
+          ? 'Người dùng chủ động hủy thanh toán.'
+          : 'Người dùng chủ động hủy.',
+        refundStatus: isPaid ? 'PENDING' : 'NONE',
       },
     });
 
-    // --- REAL-TIME EMISSIONS ---
-    this.notificationGateway.emitToRoom(
-      `room_court_${booking.courtId}`,
-      'slots_released',
-      {
-        bookingDate: booking.bookingDate,
-        slots: [booking.startTime],
-      },
-    );
+    // --- RELEASE ALL REDIS LOCKS ---
+    for (const b of bookingsToCancel) {
+      const lockKey = `booking_lock:${b.courtId}:${b.bookingDate}:${b.startTime}`;
+      await this.redisService.del(lockKey);
 
+      // Notify real-time for each slot
+      this.notificationGateway.emitToRoom(
+        `room_court_${b.courtId}`,
+        'slots_released',
+        {
+          bookingDate: b.bookingDate,
+          slots: [b.startTime],
+        },
+      );
+    }
+
+    // --- CLEANUP ORDER STATE ---
+    if (isPending && booking.payosOrderCode) {
+      const orderCode = booking.payosOrderCode?.toString();
+      if (orderCode) {
+        await this.redisService.del(`temp_order:${orderCode}`);
+        await this.redisService.srem(
+          `user_pending_orders:${userId}`,
+          orderCode,
+        );
+      }
+    }
+
+    // --- NOTIFY OWNER ---
     this.notificationGateway.notifyOwner(
       booking.court.ownerId,
       'booking_canceled',
@@ -437,12 +597,33 @@ export class BookingService {
         courtName: booking.court.name,
         bookingDate: booking.bookingDate,
         startTime: booking.startTime,
-        reason: 'Khách hàng chủ động hủy lịch.',
+        reason: isPending ? 'Khách hủy thanh toán.' : 'Khách chủ động hủy đơn.',
         canceledBy: 'CUSTOMER',
       },
     );
 
-    return updatedBooking;
+    // --- EMAIL NOTIFICATION ---
+    try {
+      await this.mailerService.sendMail({
+        to: booking.user.email,
+        subject: `[Nova Booking] Thông báo hủy đơn đặt sân thành công`,
+        html: `
+          <h3>Thông báo hủy đơn thành công</h3>
+          <p>Chào <b>${booking.user.fullName}</b>,</p>
+          <p>Yêu cầu hủy đơn đặt sân <b>${booking.court.name}</b> của bạn đã được thực hiện thành công.</p>
+          <ul>
+            <li><b>Ngày chơi:</b> ${booking.bookingDate}</li>
+            <li><b>Các khung giờ:</b> ${bookingsToCancel.map((b) => b.startTime).join(', ')}</li>
+            ${isPaid ? '<li><b>Trạng thái hoàn tiền:</b> Đang chờ xử lý.</li>' : ''}
+          </ul>
+          <p>Cảm ơn bạn đã sử dụng dịch vụ của Nova Booking!</p>
+        `,
+      });
+    } catch (mailError) {
+      this.logger.error(`Failed to send cancellation email: ${mailError}`);
+    }
+
+    return { success: true, cancelledCount: bookingsToCancel.length };
   }
 
   // --- Admin Methods with Isolation ---

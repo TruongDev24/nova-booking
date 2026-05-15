@@ -127,7 +127,7 @@ describe('CourtService', () => {
 
       await service.remove(mockCourtId, mockOwnerId);
 
-      expect(prisma.booking.updateMany).toHaveBeenCalled();
+      expect(prisma.booking.update).toHaveBeenCalled();
       expect(notificationGateway.emitToRoom).toHaveBeenCalledWith(
         expect.stringContaining('room_user_'),
         'booking_canceled',

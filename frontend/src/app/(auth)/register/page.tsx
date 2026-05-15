@@ -23,6 +23,7 @@ import Link from "next/link";
 // --- Types ---
 interface RegisterResponse {
     access_token: string;
+    refresh_token: string;
     user: {
         id: string;
         email: string;
@@ -34,23 +35,23 @@ interface RegisterResponse {
 // --- Validation Schema with Zod ---
 const registerSchema = z
     .object({
-        fullName: z.string().min(2, "Full name must be at least 2 characters").max(100, "Full name is too long"),
-        email: z.string().email("Please enter a valid email address").max(150),
+        fullName: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự").max(100, "Họ tên quá dài"),
+        email: z.string().email("Vui lòng nhập email hợp lệ").max(150),
         phone: z
             .string()
             .regex(
                 /^(0[3|5|7|8|9])[0-9]{8}$/,
-                "Please enter a valid 10-digit Vietnam phone number"
+                "Vui lòng nhập số điện thoại Việt Nam hợp lệ (10 số)"
             ),
         password: z
             .string()
-            .min(8, "Password must be at least 8 characters long")
-            .regex(/[A-Z]/, "Password must contain at least 1 uppercase letter")
-            .regex(/[0-9]/, "Password must contain at least 1 number"),
+            .min(8, "Mật khẩu phải có ít nhất 8 ký tự")
+            .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa")
+            .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số"),
         confirmPassword: z.string(),
     })
     .refine((data) => data.password === data.confirmPassword, {
-        message: "Passwords do not match",
+        message: "Mật khẩu xác nhận không khớp",
         path: ["confirmPassword"],
     });
 
@@ -108,33 +109,14 @@ export default function RegisterPage() {
                 }
             );
 
-            // Save token to Cookies for middleware compatibility
-            const token = response.data?.access_token;
-            const user = response.data?.user;
-            const userRole = user?.role || "USER";
+            toast.success("Tạo tài khoản thành công! Vui lòng đăng nhập.");
 
-            if (token) {
-                Cookies.set("access_token", token, {path: "/"});
-                sessionStorage.setItem("access_token", token);
-                if (user) {
-                    sessionStorage.setItem("user", JSON.stringify(user));
-                }
-            }
-
-            toast.success("Account created successfully!");
-
-            // Redirect based on role (always USER here, but keep logic for safety)
-            setTimeout(() => {
-                if (userRole === "ADMIN") {
-                    router.push("/admin");
-                } else {
-                    router.push("/user");
-                }
-            }, 1500);
+            // Redirect to login instead of auto-login
+            router.push("/login");
         } catch (error: unknown) {
             if (axios.isAxiosError(error)) {
                 const errorData = error.response?.data as { message?: string | string[] };
-                const errorMsg = errorData.message || "Something went wrong during registration.";
+                const errorMsg = errorData.message || "Đã xảy ra lỗi trong quá trình đăng ký.";
 
                 if (Array.isArray(errorMsg)) {
                     toast.error(errorMsg[0]);
@@ -142,7 +124,7 @@ export default function RegisterPage() {
                     toast.error(errorMsg);
                 }
             } else {
-                toast.error("An unexpected error occurred.");
+                toast.error("Đã xảy ra lỗi không xác định.");
             }
         }
     };
@@ -165,7 +147,7 @@ export default function RegisterPage() {
                         </h1>
                     </div>
                     <p className="text-slate-400 text-sm relative z-10">
-                        Create your account to book sports courts instantly
+                        Đăng ký tài khoản để đặt sân ngay lập tức
                     </p>
                 </div>
 
@@ -173,7 +155,7 @@ export default function RegisterPage() {
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Full Name
+                                Họ và Tên
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -199,7 +181,7 @@ export default function RegisterPage() {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Email Address
+                                Địa chỉ Email
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -225,7 +207,7 @@ export default function RegisterPage() {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Phone Number
+                                Số điện thoại
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -251,7 +233,7 @@ export default function RegisterPage() {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Password
+                                Mật khẩu
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -288,7 +270,7 @@ export default function RegisterPage() {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Confirm Password
+                                Xác nhận mật khẩu
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -331,10 +313,10 @@ export default function RegisterPage() {
                             {isSubmitting ? (
                                 <>
                                     <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"/>
-                                    Processing...
+                                    Đang xử lý...
                                 </>
                             ) : (
-                                "Create Account"
+                                "Đăng ký tài khoản"
                             )}
                         </button>
                     </form>
@@ -352,12 +334,12 @@ export default function RegisterPage() {
                             </p>
                         </div>
                         <p className="text-sm text-slate-600">
-                            Already have an account?{" "}
+                            Đã có tài khoản?{" "}
                             <Link
                                 href="/login"
                                 className="font-semibold text-cyan-600 hover:text-cyan-500 transition-colors"
                             >
-                                Sign In
+                                Đăng nhập ngay
                             </Link>
                         </p>
                     </div>

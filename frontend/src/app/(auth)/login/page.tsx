@@ -23,8 +23,8 @@ import {useEffect} from "react";
 
 // --- Validation Schema with Zod ---
 const loginSchema = z.object({
-    email: z.string().email("Please enter a valid email address").min(1, "Email is required"),
-    password: z.string().min(1, "Password is required"),
+    email: z.string().email("Vui lòng nhập email hợp lệ").min(1, "Email không được để trống"),
+    password: z.string().min(1, "Mật khẩu không được để trống"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -76,44 +76,38 @@ export default function LoginPage() {
                 data
             );
 
-            const {access_token, user} = response.data;
+            const {access_token, refresh_token, user} = response.data;
 
-            sessionStorage.setItem("access_token", access_token);
-            sessionStorage.setItem("user", JSON.stringify(user));
+            // Store tokens in Cookies for Middleware and Interceptors
             Cookies.set("access_token", access_token, {path: "/"});
+            Cookies.set("refresh_token", refresh_token, {path: "/", expires: 7}); // RT lasts 7 days
+            
+            // Store user info in sessionStorage for fast UI access
+            sessionStorage.setItem("user", JSON.stringify(user));
 
-            toast.success("Login successful! Redirecting...");
+            toast.success("Đăng nhập thành công! Đang chuyển hướng...");
 
-            setTimeout(() => {
-                if (user.role === "ADMIN") {
-                    router.push("/admin");
-                } else {
-                    // Step 4: Login Reminder for User
-                    if (!user.bankAccountNumber) {
-                        toast("Vui lòng cập nhật thông tin ngân hàng trong trang cá nhân để thuận tiện cho việc hoàn tiền khi hủy sân.", {
-                            duration: 6000,
-                            icon: '🏦',
-                            style: {
-                                borderRadius: '16px',
-                                background: '#334155',
-                                color: '#fff',
-                                fontWeight: 'bold',
-                                fontSize: '14px'
-                            },
-                        });
-                    }
-                    router.push("/user");
+            // Use router.push for smooth client-side transition without reload
+            if (user.role === "ADMIN") {
+                router.push("/admin");
+            } else {
+                if (!user.bankAccountNumber) {
+                    toast("Vui lòng cập nhật thông tin ngân hàng trong trang cá nhân để thuận tiện cho việc hoàn tiền khi hủy sân.", {
+                        duration: 6000,
+                        icon: '🏦',
+                    });
                 }
-            }, 1500);
+                router.push("/user");
+            }
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 const errorMsg = error.response?.status === 401
-                    ? "Invalid email or password"
-                    : error.response?.data?.message || "Something went wrong during login.";
+                    ? "Email hoặc mật khẩu không chính xác"
+                    : error.response?.data?.message || "Đã xảy ra lỗi trong quá trình đăng nhập.";
 
                 toast.error(Array.isArray(errorMsg) ? errorMsg[0] : errorMsg);
             } else {
-                toast.error("An unexpected error occurred.");
+                toast.error("Đã xảy ra lỗi không xác định.");
             }
         }
     };
@@ -158,7 +152,7 @@ export default function LoginPage() {
                         </h1>
                     </div>
                     <p className="text-slate-400 text-sm relative z-10">
-                        {isForgotMode ? "Recover your account access" : "Sign in to manage your court bookings"}
+                        {isForgotMode ? "Khôi phục truy cập tài khoản" : "Đăng nhập để quản lý lịch đặt sân của bạn"}
                     </p>
                 </div>
 
@@ -171,11 +165,11 @@ export default function LoginPage() {
                                 onClick={() => setIsForgotMode(false)}
                                 className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors mb-2"
                             >
-                                <ArrowLeft className="w-4 h-4"/> Back to login
+                                <ArrowLeft className="w-4 h-4"/> Quay lại đăng nhập
                             </button>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Email Address
+                                    Địa chỉ Email
                                 </label>
                                 <div className="relative">
                                     <div
@@ -188,7 +182,7 @@ export default function LoginPage() {
                                         value={forgotEmail}
                                         onChange={(e) => setForgotEmail(e.target.value)}
                                         className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-100 focus:border-cyan-500 focus:outline-none transition-colors"
-                                        placeholder="Enter your registered email"
+                                        placeholder="Nhập email đã đăng ký"
                                     />
                                 </div>
                             </div>
@@ -201,10 +195,10 @@ export default function LoginPage() {
                                 {isForgotLoading ? (
                                     <>
                                         <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"/>
-                                        Sending Request...
+                                        Đang gửi yêu cầu...
                                     </>
                                 ) : (
-                                    "Send Reset Instructions"
+                                    "Gửi hướng dẫn đặt lại mật khẩu"
                                 )}
                             </button>
                         </form>
@@ -242,14 +236,14 @@ export default function LoginPage() {
                             <div>
                                 <div className="flex items-center justify-between mb-1">
                                     <label className="block text-sm font-medium text-slate-700">
-                                        Password
+                                        Mật khẩu
                                     </label>
                                     <button
                                         type="button"
                                         onClick={() => setIsForgotMode(true)}
                                         className="text-xs font-semibold text-cyan-600 hover:text-cyan-500 transition-colors"
                                     >
-                                        Forgot password?
+                                        Quên mật khẩu?
                                     </button>
                                 </div>
                                 <div className="relative">
@@ -295,10 +289,10 @@ export default function LoginPage() {
                                 {isSubmitting ? (
                                     <>
                                         <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"/>
-                                        Authenticating...
+                                        Đang xác thực...
                                     </>
                                 ) : (
-                                    "Sign In"
+                                    "Đăng nhập"
                                 )}
                             </button>
                         </form>
@@ -307,12 +301,12 @@ export default function LoginPage() {
                     {/* Footer Link */}
                     <div className="mt-8 text-center space-y-4">
                         <p className="text-sm text-slate-600">
-                            Don&apos;t have an account?{" "}
+                            Chưa có tài khoản?{" "}
                             <Link
                                 href="/register"
                                 className="font-semibold text-cyan-600 hover:text-cyan-500 transition-colors"
                             >
-                                Sign Up
+                                Đăng ký ngay
                             </Link>
                         </p>
                         <div className="pt-4 border-t border-slate-100">

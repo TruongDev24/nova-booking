@@ -9,7 +9,7 @@ import {
   Matches,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsFutureOrToday } from '../../common/decorators/is-future-or-today.decorator';
+import { IsFutureOrToday } from '../../common/validators/is-future-or-today.validator';
 
 export class CreateBookingDto {
   @ApiProperty({

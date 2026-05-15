@@ -4,6 +4,7 @@ import { UsersService } from '../../src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../src/prisma/prisma.service';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
@@ -25,6 +26,7 @@ describe('AuthService', () => {
 
   const mockJwtService = {
     sign: jest.fn(),
+    signAsync: jest.fn(),
   };
 
   const mockMailerService = {
@@ -35,6 +37,14 @@ describe('AuthService', () => {
     get: jest.fn().mockReturnValue('http://localhost:3000'),
   };
 
+  const mockPrismaService = {
+    refreshToken: {
+      create: jest.fn(),
+      delete: jest.fn(),
+      findUnique: jest.fn(),
+    },
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +53,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: MailerService, useValue: mockMailerService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();
 
@@ -69,6 +80,7 @@ describe('AuthService', () => {
       const hashedPassword = 'hashedPassword';
       (bcrypt.genSalt as jest.Mock).mockResolvedValue('salt');
       (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
+      mockJwtService.signAsync.mockResolvedValue('mock-token');
 
       const savedUser = {
         id: 'uuid-123',
@@ -79,6 +91,7 @@ describe('AuthService', () => {
       };
 
       mockUsersService.create.mockResolvedValue(savedUser);
+      mockPrismaService.refreshToken.create.mockResolvedValue({});
 
       const result = await service.register(registerDto);
 
@@ -90,14 +103,14 @@ describe('AuthService', () => {
         }),
       );
 
-      // CRITICAL ASSERT: Không được trả về access_token
+      // Assertions match NEW service behavior (No Auto-Login)
       expect(result).not.toHaveProperty('access_token');
-      expect(result).not.toHaveProperty('user'); // Trả về user object trực tiếp, không bọc trong field 'user'
-      expect(result).not.toHaveProperty('password');
+      expect(result).not.toHaveProperty('refresh_token');
       expect(result.email).toBe(registerDto.email);
 
-      // CRITICAL ASSERT: JwtService.sign KHÔNG được gọi
-      expect(mockJwtService.sign).not.toHaveBeenCalled();
+      // Verify tokens were NOT generated or saved
+      expect(mockJwtService.signAsync).not.toHaveBeenCalled();
+      expect(mockPrismaService.refreshToken.create).not.toHaveBeenCalled();
     });
 
     it('Scenario 2 (Conflict Error - Email Exists): Nên báo lỗi nếu email đã tồn tại', async () => {
@@ -166,20 +179,18 @@ describe('AuthService', () => {
       role: Role.USER,
     };
 
-    it('should return access_token and user object', () => {
+    it('should return access_token and user object', async () => {
       const token = 'jwt-token';
-      mockJwtService.sign.mockReturnValue(token);
+      mockJwtService.signAsync.mockResolvedValue(token);
+      mockPrismaService.refreshToken.create.mockResolvedValue({});
 
-      const result = service.login(user);
+      const result = await service.login(user, 'test-agent');
 
-      expect(mockJwtService.sign).toHaveBeenCalledWith({
-        email: user.email,
-        sub: user.id,
-        role: user.role,
-        fullName: user.fullName,
-      });
+      expect(mockJwtService.signAsync).toHaveBeenCalled();
+      expect(mockPrismaService.refreshToken.create).toHaveBeenCalled();
       expect(result).toEqual({
         access_token: token,
+        refresh_token: token,
         user: {
           id: user.id,
           email: user.email,

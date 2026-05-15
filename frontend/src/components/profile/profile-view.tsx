@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import {authService} from "@/services/auth.service";
 import {toast} from "sonner";
-import {handleComingSoon} from "@/utils/coming-soon";
+import {useRouter} from "next/navigation";
+import {handleComingSoon} from "@/lib/coming-soon";
 import {
     Card,
     CardContent,
@@ -37,6 +38,7 @@ interface UserData {
 }
 
 export function ProfileView() {
+    const router = useRouter();
     const [userData, setUserData] = useState<UserData | null>(null);
     const [isDataLoading, setIsDataLoading] = useState(true);
 
@@ -225,7 +227,7 @@ export function ProfileView() {
                                         <p className="text-slate-400 text-sm">Hệ thống sẽ tự động hoàn tiền vào tài khoản này.</p>
                                     </div>
                                     <Button 
-                                        onClick={() => window.location.href = "/user/profile/bank"}
+                                        onClick={() => router.push("/user/profile/bank")}
                                         className="h-12 px-8 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                                     >
                                         Cập nhật ngay

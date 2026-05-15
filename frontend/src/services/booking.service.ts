@@ -1,4 +1,4 @@
-import apiClient from "./apiClient";
+import apiClient from "@/services/apiClient";
 
 export interface TimeSlot {
     startTime: string;
@@ -31,6 +31,7 @@ export interface Booking {
     totalPrice: number;
     status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
     refundStatus: 'NONE' | 'PENDING' | 'COMPLETED';
+    cancelReason?: string;
     createdAt: string;
     user?: {
         id: string;

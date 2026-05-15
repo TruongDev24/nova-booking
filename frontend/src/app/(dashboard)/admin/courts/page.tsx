@@ -15,7 +15,7 @@ import Image from "next/image";
 import {ColumnDef} from "@tanstack/react-table";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 
-import {DataTable} from "@/components/ui/data-table";
+import {DataTable} from "@/components/data-table/data-table";
 import {Button} from "@/components/ui/button";
 import {
     DropdownMenu,

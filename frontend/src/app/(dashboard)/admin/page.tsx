@@ -23,8 +23,8 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { analyticsService } from "@/services/analytics.service";
-import PeakHoursChart from "./components/PeakHoursChart";
-import VipCustomersTable from "./components/VipCustomersTable";
+import PeakHoursChart from "@/components/admin/peak-hours-chart";
+import VipCustomersTable from "@/components/admin/vip-customers-table";
 import {
     Card,
     CardContent,

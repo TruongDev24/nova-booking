@@ -214,21 +214,28 @@ export class CourtService {
       },
     });
 
-    await this.prisma.$transaction([
-      this.prisma.court.update({
+    const cancelReason = `Sân ${court.name} tạm đóng cửa bảo trì.`;
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Lock the court
+      await tx.court.update({
         where: { id },
         data: { isDeleted: true },
-      }),
-      this.prisma.booking.updateMany({
-        where: {
-          id: { in: futureBookings.map((b) => b.id) },
-        },
-        data: {
-          status: 'CANCELLED',
-          cancelReason: `Sân ${court.name} ngừng hoạt động.`,
-        },
-      }),
-    ]);
+      });
+
+      // 2. Cancel all future bookings with refund logic
+      for (const booking of futureBookings) {
+        const isPaid = booking.paymentStatus === 'PAID';
+        await tx.booking.update({
+          where: { id: booking.id },
+          data: {
+            status: 'CANCELLED',
+            cancelReason: cancelReason,
+            refundStatus: isPaid ? 'PENDING' : 'NONE',
+          },
+        });
+      }
+    });
 
     // Trigger: Private Alerts for affected users
     for (const booking of futureBookings) {
@@ -240,7 +247,7 @@ export class CourtService {
           courtName: court.name,
           bookingDate: booking.bookingDate,
           startTime: booking.startTime,
-          reason: `Sân ${court.name} ngừng hoạt động.`,
+          reason: cancelReason,
         },
       );
     }
@@ -258,16 +265,21 @@ export class CourtService {
 
     if (futureBookings.length > 0) {
       const emailPromises = futureBookings.map((booking) => {
+        const isPaid = booking.paymentStatus === 'PAID';
         return this.mailerService.sendMail({
           to: booking.user.email,
-          subject: `[Nova Booking] Thông báo hủy lịch đặt sân ${court.name}`,
+          subject: `[Nova Booking] Thông báo hủy lịch đặt sân ${court.name} (Bảo trì)`,
           html: `
             <div style="font-family: sans-serif; padding: 20px; color: #333;">
-              <h2 style="color: #e11d48;">Thông báo hủy lịch đặt sân</h2>
+              <h2 style="color: #e11d48;">Thông báo hủy lịch do bảo trì sân</h2>
               <p>Xin chào <strong>${booking.user.fullName}</strong>,</p>
-              <p>Chúng tôi rất tiếc phải thông báo rằng sân <strong>${court.name}</strong> đã ngừng hoạt động.</p>
+              <p>Chúng tôi rất tiếc phải thông báo rằng sân <strong>${court.name}</strong> sẽ tạm đóng cửa để bảo trì đột xuất.</p>
               <p>Lịch đặt của bạn vào ngày <strong>${booking.bookingDate}</strong> lúc <strong>${booking.startTime}</strong> đã bị hủy.</p>
-              <p>Chúng tôi rất xin lỗi vì sự bất tiện này. Nếu bạn đã thanh toán, vui lòng liên hệ với chủ sân để được hoàn tiền.</p>
+              ${
+                isPaid
+                  ? '<p style="color: #059669; font-weight: bold;">Vì bạn đã thanh toán, hệ thống đã ghi nhận yêu cầu hoàn tiền. Admin sẽ xử lý và hoàn tiền cho bạn trong thời gian sớm nhất.</p>'
+                  : '<p>Vì đơn hàng chưa được thanh toán thành công, hệ thống chỉ thực hiện hủy lịch.</p>'
+              }
               <br />
               <p>Trân trọng,</p>
               <p><strong>Nova Booking Team</strong></p>

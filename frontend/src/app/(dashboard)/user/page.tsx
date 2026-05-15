@@ -4,11 +4,11 @@ import React, {useState, useEffect} from "react";
 import {Search, MapPin, Star, Clock, ArrowRight, Image as ImageIcon} from "lucide-react";
 import {courtService, PaginatedCourts, Court} from "@/services/court.service";
 import Link from "next/link";
-import { CourtCard } from "@/components/ui/court-card";
+import { CourtCard } from "@/components/courts/court-card";
 import {toast as hotToast, Toaster} from "react-hot-toast";
 import {toast} from "sonner";
-import {useSocket} from "@/hooks/useSocket";
-import {handleComingSoon} from "@/utils/coming-soon";
+import {useSocket} from "@/hooks/use-socket";
+import {handleComingSoon} from "@/lib/coming-soon";
 
 export default function ExploreCourtsPage() {
     const [courtsData, setCourtsData] = useState<PaginatedCourts | null>(null);

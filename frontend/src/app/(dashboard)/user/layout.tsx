@@ -1,4 +1,4 @@
-import {UserSocketListener} from "./components/UserSocketListener";
+import {UserSocketListener} from "@/components/user/user-socket-listener";
 
 export default function UserLayout({
                                        children,

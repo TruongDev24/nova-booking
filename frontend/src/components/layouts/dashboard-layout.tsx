@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import Cookies from "js-cookie";
 import {authService} from "@/services/auth.service";
-import {handleComingSoon} from "@/utils/coming-soon";
+import {handleComingSoon} from "@/lib/coming-soon";
 
 import {
     Sidebar,
@@ -92,12 +92,26 @@ export function DashboardLayout({
     const router = useRouter();
 
     React.useEffect(() => {
+        // 1. Load from sessionStorage immediately (UX: No flicker)
+        const savedUser = sessionStorage.getItem("user");
+        if (savedUser) {
+            try {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setUserData(JSON.parse(savedUser));
+            } catch (e) {
+                console.error("Failed to parse saved user", e);
+            }
+        }
+
+        // 2. Fetch fresh data from server (Integrity)
         const fetchUser = async () => {
             try {
                 const profile = await authService.getProfile();
                 setUserData(profile);
+                sessionStorage.setItem("user", JSON.stringify(profile));
             } catch (error) {
                 console.error("Failed to fetch profile in layout:", error);
+                // If 401, apiClient will handle the redirect
             }
         };
         fetchUser();
@@ -106,15 +120,23 @@ export function DashboardLayout({
     const profileHref = pathname.startsWith("/admin") ? "/admin/profile" : "/user/profile";
     const menuItems = initialMenuItems;
 
-    const roleLabel = userData?.fullName || initialRoleLabel;
-    const userEmail = userData?.email || "user@nova.com";
+    const roleLabel = userData?.fullName || (pathname.startsWith("/admin") ? "Quản trị viên" : "Khách hàng");
+    const userEmail = userData?.email || "...";
 
-    const confirmLogout = () => {
-        Cookies.remove("access_token");
-        sessionStorage.clear();
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
+    const confirmLogout = async () => {
+        setIsLogoutOpen(false);
+        // Navigate immediately for better UX
         router.push("/login");
+        // Clear local data
+        sessionStorage.clear();
+        Cookies.remove("access_token");
+        Cookies.remove("refresh_token");
+        // Notify backend in background
+        try {
+            await authService.logout();
+        } catch (e) {
+            console.warn("Backend logout failed, but local session cleared", e);
+        }
     };
 
     const [titleOverride, setTitleOverride] = React.useState<string | null>(null);
@@ -210,7 +232,7 @@ export function DashboardLayout({
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
                                     <BreadcrumbLink href={pathname.startsWith("/admin") ? "/admin" : "/user"}>
-                                        {pathname.startsWith("/admin") ? "Admin" : "User"}
+                                        {pathname.startsWith("/admin") ? "Quản trị" : "Người dùng"}
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 {breadcrumbs.map((crumb) => (

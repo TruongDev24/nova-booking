@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.git
+.github
+*.log
+npm-debug.log*
+.prettierrc
+Dockerfile*
+docker-compose*
+README.md
+codebase_report.md
+database_architecture.md

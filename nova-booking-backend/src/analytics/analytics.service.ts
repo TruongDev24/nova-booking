@@ -67,15 +67,22 @@ export class AnalyticsService {
       return (isPaid || isCompleted) && !isCancelled && !isRefunded;
     });
 
-    const cancelledAll = allBookings.filter((b) => b.status === 'CANCELLED');
-
-    // 4. Aggregations (Using ALL for overview to satisfy user request for visibility)
+    // 4. Aggregations
     const totalRevenue = successAll.reduce((sum, b) => sum + b.totalPrice, 0);
     const totalHours = successAll.length;
 
+    // New Cancellation Rate Logic: Only count bookings that were actually PAID
+    const paidBookings = allBookings.filter(
+      (b) =>
+        b.paymentStatus === 'PAID' ||
+        b.paymentStatus === 'REFUNDED' ||
+        b.status === 'COMPLETED',
+    );
+    const cancelledPaid = paidBookings.filter((b) => b.status === 'CANCELLED');
+
     const cancellationRate =
-      allBookings.length > 0
-        ? (cancelledAll.length / allBookings.length) * 100
+      paidBookings.length > 0
+        ? (cancelledPaid.length / paidBookings.length) * 100
         : 0;
 
     // Occupancy Rate (For the period)

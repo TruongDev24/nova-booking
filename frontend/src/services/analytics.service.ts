@@ -1,4 +1,4 @@
-import apiClient from "./apiClient";
+import apiClient from "@/services/apiClient";
 
 export const analyticsService = {
     getAdminAnalytics: async (period: number = 7) => {

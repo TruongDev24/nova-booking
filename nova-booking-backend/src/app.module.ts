@@ -38,44 +38,24 @@ import { NotificationModule } from './notification/notification.module';
     RedisModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => {
-        const service = config.get<string>('SMTP_SERVICE');
-        const port =
-          Number(config.get('SMTP_PORT')) ||
-          (service === 'mailtrap' ? 2525 : 587);
-
-        return {
-          transport: {
-            service: service === 'gmail' ? 'gmail' : undefined,
-            host: service === 'gmail' ? undefined : config.get('SMTP_HOST'),
-            port: port,
-            secure: port === 465,
-            auth: {
-              user: config.get('SMTP_USER'),
-              pass: config.get('SMTP_PASS'),
-            },
-            tls: {
-              rejectUnauthorized: false,
-              // Forced IPv4 for TLS as well
-              servername:
-                service === 'gmail'
-                  ? 'smtp.gmail.com'
-                  : service === 'mailtrap'
-                    ? 'sandbox.smtp.mailtrap.io'
-                    : undefined,
-            },
-            family: 4, // Force IPv4
-            connectionTimeout: 15000, // 15 seconds
-            greetingTimeout: 15000,
-            socketTimeout: 15000,
+      useFactory: (config: ConfigService) => ({
+        transport: {
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true, // true for 465, false for other ports
+          auth: {
+            user: config.get('SMTP_USER'),
+            pass: config.get('SMTP_PASS'),
           },
-          defaults: {
-            from:
-              config.get('SMTP_FROM') ||
-              `"Nova Booking" <${config.get('SMTP_USER')}>`,
+          tls: {
+            rejectUnauthorized: false,
           },
-        };
-      },
+          family: 4, // Force IPv4 to avoid connectivity issues
+        },
+        defaults: {
+          from: `"Nova Booking" <${config.get('SMTP_USER')}>`,
+        },
+      }),
       inject: [ConfigService],
     }),
     PrismaModule,

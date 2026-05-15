@@ -1,4 +1,5 @@
-import apiClient from './apiClient';
+import apiClient from '@/services/apiClient';
+import Cookies from 'js-cookie';
 
 export interface ChangePasswordDto {
     oldPassword: string;
@@ -33,5 +34,19 @@ export const authService = {
     getProfile: async () => {
         const response = await apiClient.get('/auth/profile');
         return response.data;
+    },
+
+    logout: async () => {
+        const refreshToken = Cookies.get('refresh_token');
+        if (refreshToken) {
+            try {
+                await apiClient.post('/auth/logout', { refresh_token: refreshToken });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+        Cookies.remove('access_token');
+        Cookies.remove('refresh_token');
+        sessionStorage.clear();
     },
 };
