@@ -61,6 +61,26 @@ export default function RegisterPage() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const router = useRouter();
 
+    // Auto-redirect if already logged in
+    React.useEffect(() => {
+        const token = Cookies.get("access_token");
+        if (token && token !== "undefined") {
+            const userStr = sessionStorage.getItem("user");
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    if (user.role === "ADMIN") {
+                        router.push("/admin");
+                    } else {
+                        router.push("/user");
+                    }
+                } catch (e) {
+                    // Ignore parse error
+                }
+            }
+        }
+    }, [router]);
+
     const {
         register,
         handleSubmit,

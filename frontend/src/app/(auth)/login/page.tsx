@@ -18,6 +18,8 @@ import {
 import Link from "next/link";
 import {authService} from "@/services/auth.service";
 import Cookies from "js-cookie";
+import {useRouter} from "next/navigation";
+import {useEffect} from "react";
 
 // --- Validation Schema with Zod ---
 const loginSchema = z.object({
@@ -28,10 +30,31 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+    const router = useRouter();
     const [showPassword, setShowPassword] = useState(false);
     const [isForgotMode, setIsForgotMode] = useState(false);
     const [forgotEmail, setForgotEmail] = useState("");
     const [isForgotLoading, setIsForgotLoading] = useState(false);
+
+    // Auto-redirect if already logged in
+    useEffect(() => {
+        const token = Cookies.get("access_token");
+        if (token && token !== "undefined") {
+            const userStr = sessionStorage.getItem("user");
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    if (user.role === "ADMIN") {
+                        router.push("/admin");
+                    } else {
+                        router.push("/user");
+                    }
+                } catch (e) {
+                    // Ignore parse error
+                }
+            }
+        }
+    }, [router]);
 
     const {
         register,
@@ -56,13 +79,14 @@ export default function LoginPage() {
             const {access_token, user} = response.data;
 
             sessionStorage.setItem("access_token", access_token);
-            Cookies.set("access_token", access_token);
+            sessionStorage.setItem("user", JSON.stringify(user));
+            Cookies.set("access_token", access_token, {path: "/"});
 
             toast.success("Login successful! Redirecting...");
 
             setTimeout(() => {
                 if (user.role === "ADMIN") {
-                    window.location.href = "/admin";
+                    router.push("/admin");
                 } else {
                     // Step 4: Login Reminder for User
                     if (!user.bankAccountNumber) {
@@ -78,7 +102,7 @@ export default function LoginPage() {
                             },
                         });
                     }
-                    window.location.href = "/user";
+                    router.push("/user");
                 }
             }, 1500);
         } catch (error) {
