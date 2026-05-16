@@ -11,8 +11,10 @@ export class RedisService implements OnModuleDestroy {
 
     if (redisUrl) {
       const cleanedUrl = redisUrl.replace(/['"]/g, '').trim();
-      console.log(`🚀 Redis Service: Attempting to connect to ${cleanedUrl.split('@')[1] || 'URL'}`);
-      
+      console.log(
+        `🚀 Redis Service: Attempting to connect to ${cleanedUrl.split('@')[1] || 'URL'}`,
+      );
+
       try {
         const parsed = new URL(cleanedUrl);
         this.redis = new Redis({
@@ -23,8 +25,10 @@ export class RedisService implements OnModuleDestroy {
           tls: cleanedUrl.startsWith('rediss://') ? {} : undefined,
           maxRetriesPerRequest: 3,
         });
-      } catch (e) {
-        console.error('🚀 Redis Service: Failed to parse REDIS_URL, trying direct connection');
+      } catch {
+        console.error(
+          '🚀 Redis Service: Failed to parse REDIS_URL, trying direct connection',
+        );
         this.redis = new Redis(cleanedUrl, { maxRetriesPerRequest: 3 });
       }
     } else {
