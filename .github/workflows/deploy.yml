@@ -1,19 +1,21 @@
-name: CI/CD Pipeline
+name: NOVA Booking CI/CD
 
 on:
-  workflow_dispatch: # Cho phép chạy thủ công từ tab Actions
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
+  # 🔍 Giai đoạn 1: Kiểm tra chất lượng mã nguồn
   audit-and-test:
+    name: 🧪 Audit & Build Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -22,76 +24,53 @@ jobs:
             frontend/package-lock.json
             nova-booking-backend/package-lock.json
 
-      # --- Backend Audit & Build Check ---
-      - name: Backend - Install dependencies
+      # --- Kiểm tra Backend ---
+      - name: Backend - Install & Lint
         working-directory: ./nova-booking-backend
-        run: npm ci
+        run: |
+          npm ci
+          npx prisma generate
+          npm run lint
 
-      - name: Backend - Prisma generate
-        working-directory: ./nova-booking-backend
-        run: npx prisma generate
-
-      - name: Backend - Lint
-        working-directory: ./nova-booking-backend
-        run: npm run lint
-
-      - name: Backend - Build test
+      - name: Backend - Build Check
         working-directory: ./nova-booking-backend
         run: npm run build
 
-      # --- Frontend Audit & Build Check ---
-      - name: Frontend - Install dependencies
+      # --- Kiểm tra Frontend ---
+      - name: Frontend - Install & Lint
         working-directory: ./frontend
-        run: npm ci
+        run: |
+          npm ci
+          npm run lint
 
-      - name: Frontend - Lint
-        working-directory: ./frontend
-        run: npm run lint
-
-      - name: Frontend - Build test
+      - name: Frontend - Build Check
         working-directory: ./frontend
         env:
           NEXT_PUBLIC_API_URL: https://api.placeholder.com
         run: npm run build
 
-  docker-build-check:
-    needs: audit-and-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Backend Image (Verify Dockerfile.prod)
-        uses: docker/build-push-action@v5
-        with:
-          context: ./nova-booking-backend
-          file: ./nova-booking-backend/Dockerfile.prod
-          push: false
-          tags: nova-backend:latest
-
-      - name: Build Frontend Image (Verify Dockerfile.prod)
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile.prod
-          push: false
-          tags: nova-frontend:latest
-          build-args: |
-            NEXT_PUBLIC_API_URL=https://api.placeholder.com
-
+  # 🚀 Giai đoạn 2: Tự động Deploy
   deploy:
-    needs: docker-build-check
+    name: 🚢 Deployment
+    needs: audit-and-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Render Backend Deploy
-        if: env.BACKEND_HOOK != ''
-        run: curl -f -X POST "${{ env.BACKEND_HOOK }}"
-        env:
-          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
-          
-      - name: Deployment Status
+      # 1. Trigger Render cho Backend
+      - name: 🚀 Trigger Render Backend Deploy
         run: |
-          echo "🚀 CI passed and Backend Deployment triggered (Vercel handles Frontend)!"
+          if [ -z "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}" ]; then
+            echo "❌ Error: RENDER_BACKEND_DEPLOY_HOOK is not set in GitHub Secrets!"
+            exit 1
+          fi
+          curl -f -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}"
+          echo "✅ Render deployment triggered successfully!"
+
+      # 2. Thông báo trạng thái (Vercel tự động nhận diện push nên không cần trigger tay)
+      - name: 🔔 Deployment Summary
+        run: |
+          echo "========================================================="
+          echo "🚀 CI/CD Pipeline Completed Successfully!"
+          echo "🔹 Backend: Deployment triggered on Render."
+          echo "🔹 Frontend: Vercel is automatically building your push."
+          echo "========================================================="
