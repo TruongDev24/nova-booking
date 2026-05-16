@@ -17,13 +17,18 @@ export class RedisService implements OnModuleDestroy {
 
       try {
         const parsed = new URL(cleanedUrl);
+        const isSsl = cleanedUrl.startsWith('rediss://');
         this.redis = new Redis({
           host: parsed.hostname,
           port: Number(parsed.port) || 6379,
           password: parsed.password || undefined,
           username: parsed.username || undefined,
-          tls: cleanedUrl.startsWith('rediss://') ? {} : undefined,
+          tls: isSsl ? { rejectUnauthorized: false } : undefined,
           maxRetriesPerRequest: 3,
+          retryStrategy(times) {
+            const delay = Math.min(times * 50, 2000);
+            return delay;
+          },
         });
       } catch {
         console.error(

@@ -32,14 +32,28 @@ import { APP_GUARD } from '@nestjs/core';
       imports: [ConfigModule],
       useFactory: async (config: ConfigService) => {
         const redisUrl = config.get<string>('REDIS_URL');
+        console.log('🚀 CacheModule: Initializing with Redis...');
+
+        if (redisUrl) {
+          console.log(
+            '🚀 CacheModule: Using REDIS_URL (SSL/TLS support enabled)',
+          );
+          const store = await redisStore({
+            url: redisUrl,
+            // Render Redis (rediss://) needs TLS enabled
+            socket: redisUrl.startsWith('rediss://')
+              ? { tls: true, rejectUnauthorized: false }
+              : undefined,
+          });
+          return { store };
+        }
+
+        console.log('🚀 CacheModule: Using Host/Port config');
         const store = await redisStore({
-          url: redisUrl,
-          socket: redisUrl
-            ? undefined
-            : {
-                host: config.get('REDIS_HOST', 'localhost'),
-                port: config.get<number>('REDIS_PORT', 6379),
-              },
+          socket: {
+            host: config.get('REDIS_HOST', 'localhost'),
+            port: config.get<number>('REDIS_PORT', 6379),
+          },
           password: config.get('REDIS_PASSWORD'),
         });
         return { store };
@@ -51,9 +65,18 @@ import { APP_GUARD } from '@nestjs/core';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
         const redisUrl = config.get<string>('REDIS_URL');
+        console.log('🚀 BullModule: Initializing with Redis...');
+
         if (redisUrl) {
-          return { connection: { url: redisUrl } };
+          const isSsl = redisUrl.startsWith('rediss://');
+          return {
+            connection: {
+              url: redisUrl,
+              ...(isSsl ? { tls: { rejectUnauthorized: false } } : {}),
+            },
+          };
         }
+
         return {
           connection: {
             host: config.get('REDIS_HOST', 'localhost'),
