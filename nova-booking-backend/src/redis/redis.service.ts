@@ -20,8 +20,10 @@ export class RedisService implements OnModuleDestroy {
           tls: redisUrl.startsWith('rediss://') ? {} : undefined,
           maxRetriesPerRequest: 3,
         });
-      } catch (e) {
-        console.error('🚀 Redis Service: Failed to parse REDIS_URL, falling back to basic config');
+      } catch {
+        console.error(
+          '🚀 Redis Service: Failed to parse REDIS_URL, falling back to basic config',
+        );
         this.redis = new Redis(redisUrl, { maxRetriesPerRequest: 3 });
       }
     } else {
