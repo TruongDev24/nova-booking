@@ -9,5 +9,5 @@ RUN npm install
 COPY . .
 RUN npx prisma generate
 
-# Sửa deploy thành db push để tự động cập nhật DB khi sửa schema mà không dính lỗi cờ (flag)
-CMD ["sh", "-c", "npx prisma db push && npm run start:dev"]
+RUN npm run build
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:prod"]
