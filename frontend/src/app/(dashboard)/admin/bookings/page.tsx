@@ -75,7 +75,7 @@ export default function AdminBookingsPage() {
             // Show dynamic toast based on event
             if (data?.customerName) {
                 toast.success(`Đơn hàng mới từ ${data.customerName}!`, {
-                    description: `${data.courtName} - ${data.totalPrice.toLocaleString()}đ`,
+                    description: `${data.courtName} - ${data.totalPrice?.toLocaleString() ?? "0"}đ`,
                     duration: 5000,
                 });
             } else {
