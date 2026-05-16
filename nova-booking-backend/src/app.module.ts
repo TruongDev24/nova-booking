@@ -98,11 +98,14 @@ import { APP_GUARD } from '@nestjs/core';
           `🚀 MailerModule: Initializing with host=${host}, port=${port}, user=${user ? 'SET' : 'MISSING'}`,
         );
 
+        const smtpFrom = config.get<string>('SMTP_FROM');
+        const fromAddress = smtpFrom || `"Nova Booking" <${user}>`;
+
         return {
           transport: {
             host,
-            port,
-            secure: port === 465,
+            port: Number(port),
+            secure: Number(port) === 465,
             auth: {
               user,
               pass: config.get<string>('SMTP_PASS'),
@@ -113,7 +116,7 @@ import { APP_GUARD } from '@nestjs/core';
             },
           },
           defaults: {
-            from: `"Nova Booking" <${config.get<string>('SMTP_FROM') || user}>`,
+            from: fromAddress,
           },
         };
       },
