@@ -92,17 +92,18 @@ import { APP_GUARD } from '@nestjs/core';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         transport: {
-          host: config.get('SMTP_HOST', 'smtp.gmail.com'),
-          port: config.get<number>('SMTP_PORT', 465),
+          host: config.get('SMTP_HOST', 'smtp-relay.brevo.com'),
+          port: config.get<number>('SMTP_PORT', 587),
           secure: config.get<number>('SMTP_PORT', 465) === 465,
           auth: {
             user: config.get('SMTP_USER'),
             pass: config.get('SMTP_PASS'),
           },
           tls: {
+            // Brevo and other relays often need this for STARTTLS on 587/2525
             rejectUnauthorized: false,
+            minVersion: 'TLSv1.2',
           },
-          family: 4,
         },
         defaults: {
           from: `"Nova Booking" <${config.get('SMTP_FROM') || config.get('SMTP_USER')}>`,
