@@ -91,11 +91,13 @@ import { APP_GUARD } from '@nestjs/core';
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
-        const host = config.get('SMTP_HOST', 'smtp-relay.brevo.com');
+        const host = config.get<string>('SMTP_HOST', 'smtp-relay.brevo.com');
         const port = config.get<number>('SMTP_PORT', 2525);
-        const user = config.get('SMTP_USER');
-        console.log(`🚀 MailerModule: Initializing with host=${host}, port=${port}, user=${user ? 'SET' : 'MISSING'}`);
-        
+        const user = config.get<string>('SMTP_USER');
+        console.log(
+          `🚀 MailerModule: Initializing with host=${host}, port=${port}, user=${user ? 'SET' : 'MISSING'}`,
+        );
+
         return {
           transport: {
             host,
@@ -103,7 +105,7 @@ import { APP_GUARD } from '@nestjs/core';
             secure: port === 465,
             auth: {
               user,
-              pass: config.get('SMTP_PASS'),
+              pass: config.get<string>('SMTP_PASS'),
             },
             tls: {
               rejectUnauthorized: false,
@@ -111,7 +113,7 @@ import { APP_GUARD } from '@nestjs/core';
             },
           },
           defaults: {
-            from: `"Nova Booking" <${config.get('SMTP_FROM') || user}>`,
+            from: `"Nova Booking" <${config.get<string>('SMTP_FROM') || user}>`,
           },
         };
       },
