@@ -30,10 +30,9 @@ export class CourtService {
   private async clearCourtCache() {
     // Clear all court-related cache keys
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const store = this.cacheManager.store as any;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (typeof store.keys === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const store = (this.cacheManager as any).stores?.[0];
+    if (store && typeof store.keys === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       const keys = (await store.keys('courts_*')) as string[];
       for (const key of keys) {
         await this.cacheManager.del(key);
