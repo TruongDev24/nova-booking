@@ -77,9 +77,11 @@ describe('CourtService', () => {
             get: jest.fn(),
             set: jest.fn(),
             del: jest.fn(),
-            stores: [{
-              keys: jest.fn().mockResolvedValue([]),
-            }],
+            stores: [
+              {
+                keys: jest.fn().mockResolvedValue([]),
+              },
+            ],
           },
         },
       ],
