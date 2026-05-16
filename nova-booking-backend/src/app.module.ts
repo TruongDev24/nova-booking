@@ -90,25 +90,31 @@ import { APP_GUARD } from '@nestjs/core';
     RedisModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        transport: {
-          host: config.get('SMTP_HOST', 'smtp-relay.brevo.com'),
-          port: config.get<number>('SMTP_PORT', 587),
-          secure: config.get<number>('SMTP_PORT', 465) === 465,
-          auth: {
-            user: config.get('SMTP_USER'),
-            pass: config.get('SMTP_PASS'),
+      useFactory: (config: ConfigService) => {
+        const host = config.get('SMTP_HOST', 'smtp-relay.brevo.com');
+        const port = config.get<number>('SMTP_PORT', 2525);
+        const user = config.get('SMTP_USER');
+        console.log(`🚀 MailerModule: Initializing with host=${host}, port=${port}, user=${user ? 'SET' : 'MISSING'}`);
+        
+        return {
+          transport: {
+            host,
+            port,
+            secure: port === 465,
+            auth: {
+              user,
+              pass: config.get('SMTP_PASS'),
+            },
+            tls: {
+              rejectUnauthorized: false,
+              minVersion: 'TLSv1.2',
+            },
           },
-          tls: {
-            // Brevo and other relays often need this for STARTTLS on 587/2525
-            rejectUnauthorized: false,
-            minVersion: 'TLSv1.2',
+          defaults: {
+            from: `"Nova Booking" <${config.get('SMTP_FROM') || user}>`,
           },
-        },
-        defaults: {
-          from: `"Nova Booking" <${config.get('SMTP_FROM') || config.get('SMTP_USER')}>`,
-        },
-      }),
+        };
+      },
       inject: [ConfigService],
     }),
     PrismaModule,

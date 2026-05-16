@@ -250,6 +250,7 @@ export class AuthService {
     });
 
     const resetLink = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${rawToken}`;
+    console.log(`📧 Attempting to send reset email to: ${user.email}`);
 
     try {
       await this.mailerService.sendMail({
@@ -270,8 +271,9 @@ export class AuthService {
           </div>
         `,
       });
+      console.log(`✅ Reset email sent successfully to: ${user.email}`);
     } catch (error) {
-      console.error('Failed to send reset password email:', error);
+      console.error('❌ Failed to send reset password email:', error);
     }
 
     return {
