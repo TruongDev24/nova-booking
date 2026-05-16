@@ -19,7 +19,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     if (!token) {
       if (socket) {
         socket.disconnect();
-        setSocket(null);
+        // Use a timeout to avoid synchronous setState during render
+        setTimeout(() => setSocket(null), 0);
       }
       return;
     }
