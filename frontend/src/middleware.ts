@@ -13,8 +13,8 @@ export function middleware(request: NextRequest) {
         return t && t !== 'undefined' && t !== 'null' && t.length > 10;
     };
 
-    const isAuthPage = pathname === '/login' || pathname === '/register';
-    const isProtectedPage = pathname.startsWith('/admin') || pathname.startsWith('/user');
+    const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/admin/register';
+    const isProtectedPage = (pathname.startsWith('/admin') || pathname.startsWith('/user')) && pathname !== '/admin/register';
 
     // 1. Nếu đã có bất kỳ token nào mà vào trang login/register -> về dashboard
     if (isAuthPage && (isValid(token) || isValid(refreshToken))) {
