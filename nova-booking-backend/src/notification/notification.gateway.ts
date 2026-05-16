@@ -71,10 +71,15 @@ export class NotificationGateway
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `Socket connection error for client ${client.id}:`,
-        errorMessage,
-      );
+
+      if (errorMessage === 'jwt expired') {
+        this.logger.warn(`Client ${client.id} connection rejected: JWT expired`);
+      } else {
+        this.logger.error(
+          `Socket connection error for client ${client.id}:`,
+          errorMessage,
+        );
+      }
       client.disconnect();
     }
   }

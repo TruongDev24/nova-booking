@@ -3,6 +3,7 @@
 import React, { createContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 
 import { usePathname } from "next/navigation";
 
@@ -22,6 +23,23 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         // Use a timeout to avoid synchronous setState during render
         setTimeout(() => setSocket(null), 0);
       }
+      return;
+    }
+
+    // Check if token is expired
+    try {
+      const decoded = jwtDecode(token);
+      const currentTime = Date.now() / 1000;
+      if (decoded.exp && decoded.exp < currentTime) {
+        console.warn("Socket connection skipped: JWT expired");
+        if (socket) {
+          socket.disconnect();
+          setTimeout(() => setSocket(null), 0);
+        }
+        return;
+      }
+    } catch {
+      console.error("Invalid token found, skipping socket connection");
       return;
     }
 
