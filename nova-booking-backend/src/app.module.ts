@@ -40,9 +40,9 @@ import { NotificationModule } from './notification/notification.module';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         transport: {
-          host: 'smtp.gmail.com',
-          port: 465,
-          secure: true, // true for 465, false for other ports
+          host: config.get('SMTP_HOST', 'smtp.gmail.com'),
+          port: config.get<number>('SMTP_PORT', 465),
+          secure: config.get<number>('SMTP_PORT', 465) === 465, // true for 465, false for 587
           auth: {
             user: config.get('SMTP_USER'),
             pass: config.get('SMTP_PASS'),
