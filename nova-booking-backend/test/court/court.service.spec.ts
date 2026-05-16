@@ -12,6 +12,7 @@ import { CreateCourtDto } from '../../src/court/dto/create-court.dto';
 import { CloudinaryService } from '../../src/cloudinary/cloudinary.service';
 import { PaginationQueryDto } from '../../src/common/dto/pagination-query.dto';
 import { NotificationGateway } from '../../src/notification/notification.gateway';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 describe('CourtService', () => {
   let service: CourtService;
@@ -70,6 +71,17 @@ describe('CourtService', () => {
         { provide: MailerService, useValue: mailerService },
         { provide: CloudinaryService, useValue: cloudinaryService },
         { provide: NotificationGateway, useValue: notificationGateway },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+            stores: [{
+              keys: jest.fn().mockResolvedValue([]),
+            }],
+          },
+        },
       ],
     }).compile();
 
@@ -202,7 +214,7 @@ describe('CourtService', () => {
       expect(prisma.court.update).toHaveBeenCalled();
       expect(notificationGateway.emitToRoom).toHaveBeenCalledWith(
         'room_global_courts',
-        'court_status_changed',
+        'court_updated',
         expect.any(Object),
       );
     });
