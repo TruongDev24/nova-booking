@@ -59,11 +59,11 @@ async function bootstrap() {
   // QUAN TRỌNG: Lắng nghe trên 0.0.0.0 để Docker/Render có thể truy cập
   const port = process.env.PORT || 3001;
   const host = '0.0.0.0';
-  
+
   console.log(`🚀 Attempting to start server on ${host}:${port}...`);
-  
+
   await app.listen(port, host);
-  
+
   console.log('✅ Nest application successfully started');
   console.log(`📡 Backend is running on: http://${host}:${port}`);
   console.log(`📚 Swagger documentation: http://${host}:${port}/api`);

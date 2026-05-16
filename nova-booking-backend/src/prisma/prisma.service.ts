@@ -6,13 +6,32 @@ import { PrismaPg } from '@prisma/adapter-pg';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   constructor() {
-    // Configure direct connection using standard pg adapter since Prisma 7 removes `url` from schema
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    console.log('🚀 PrismaService: Initializing with DATABASE_URL...');
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
+      console.error(
+        '❌ PrismaService: DATABASE_URL is missing in environment!',
+      );
+    }
+
+    // Configure direct connection using standard pg adapter
+    const pool = new Pool({
+      connectionString: dbUrl,
+      connectionTimeoutMillis: 10000, // 10s timeout
+    });
     const adapter = new PrismaPg(pool);
     super({ adapter });
   }
 
   async onModuleInit() {
-    await this.$connect();
+    console.log('🚀 PrismaService: Attempting to connect to database...');
+    try {
+      await this.$connect();
+      console.log('✅ PrismaService: Connected to database successfully');
+    } catch (error) {
+      console.error('❌ PrismaService: Database connection failed:', error);
+      // Don't throw here to allow Nest to finish starting and show logs,
+      // but the app might fail later on queries.
+    }
   }
 }
