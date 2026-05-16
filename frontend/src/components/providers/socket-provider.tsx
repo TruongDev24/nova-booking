@@ -50,10 +50,9 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       socketInstance.disconnect();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSocket(null);
     };
-  }, [pathname]);
+  }, [pathname, socket]);
 
   return (
     <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>

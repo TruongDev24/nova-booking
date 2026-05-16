@@ -102,7 +102,7 @@ export default function AdminCourtsPage() {
     React.useEffect(() => {
         if (!socket) return;
 
-        const handleCourtChange = (data: any) => {
+        const handleCourtChange = (data: { name?: string; [key: string]: unknown }) => {
             console.log("Real-time court update received:", data);
             
             if (data?.name) {

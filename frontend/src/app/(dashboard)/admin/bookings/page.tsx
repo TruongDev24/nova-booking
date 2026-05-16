@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { bookingService, Booking } from "@/services/booking.service";
 import { toast } from "sonner";
+import Image from "next/image";
 import { formatToVietnamDate } from "@/lib/date-format";
 import { ColumnDef } from "@tanstack/react-table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,7 +64,12 @@ export default function AdminBookingsPage() {
     React.useEffect(() => {
         if (!socket) return;
 
-        const handleBookingChange = (data: any) => {
+        const handleBookingChange = (data: { 
+            customerName?: string; 
+            courtName?: string; 
+            totalPrice?: number;
+            [key: string]: unknown; 
+        }) => {
             console.log("Real-time booking update received:", data);
             
             // Show dynamic toast based on event
@@ -424,10 +430,11 @@ export default function AdminBookingsPage() {
                             <div className="flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
                                 {bookingToRefund.user?.bankAccountNumber ? (
                                     <div className="relative w-64 h-64 bg-white p-2 rounded-2xl shadow-sm overflow-hidden">
-                                        <img 
+                                        <Image 
                                             src={getVietQRUrl(bookingToRefund)} 
                                             alt="VietQR"
-                                            className="w-full h-full object-contain"
+                                            fill
+                                            className="object-contain"
                                         />
                                     </div>
                                 ) : (
