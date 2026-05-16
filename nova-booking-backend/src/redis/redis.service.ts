@@ -10,21 +10,22 @@ export class RedisService implements OnModuleDestroy {
     const redisUrl = this.configService.get<string>('REDIS_URL');
 
     if (redisUrl) {
+      const cleanedUrl = redisUrl.replace(/['"]/g, '').trim();
+      console.log(`🚀 Redis Service: Attempting to connect to ${cleanedUrl.split('@')[1] || 'URL'}`);
+      
       try {
-        const parsed = new URL(redisUrl);
+        const parsed = new URL(cleanedUrl);
         this.redis = new Redis({
           host: parsed.hostname,
           port: Number(parsed.port) || 6379,
           password: parsed.password || undefined,
           username: parsed.username || undefined,
-          tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+          tls: cleanedUrl.startsWith('rediss://') ? {} : undefined,
           maxRetriesPerRequest: 3,
         });
-      } catch {
-        console.error(
-          '🚀 Redis Service: Failed to parse REDIS_URL, falling back to basic config',
-        );
-        this.redis = new Redis(redisUrl, { maxRetriesPerRequest: 3 });
+      } catch (e) {
+        console.error('🚀 Redis Service: Failed to parse REDIS_URL, trying direct connection');
+        this.redis = new Redis(cleanedUrl, { maxRetriesPerRequest: 3 });
       }
     } else {
       this.redis = new Redis({
