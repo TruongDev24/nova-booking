@@ -10,9 +10,20 @@ export class RedisService implements OnModuleDestroy {
     const redisUrl = this.configService.get<string>('REDIS_URL');
 
     if (redisUrl) {
-      this.redis = new Redis(redisUrl, {
-        maxRetriesPerRequest: 3,
-      });
+      try {
+        const parsed = new URL(redisUrl);
+        this.redis = new Redis({
+          host: parsed.hostname,
+          port: Number(parsed.port) || 6379,
+          password: parsed.password || undefined,
+          username: parsed.username || undefined,
+          tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+          maxRetriesPerRequest: 3,
+        });
+      } catch (e) {
+        console.error('🚀 Redis Service: Failed to parse REDIS_URL, falling back to basic config');
+        this.redis = new Redis(redisUrl, { maxRetriesPerRequest: 3 });
+      }
     } else {
       this.redis = new Redis({
         host: this.configService.get<string>('REDIS_HOST', 'localhost'),
