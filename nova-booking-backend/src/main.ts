@@ -21,12 +21,15 @@ async function bootstrap() {
   );
 
   // Bật CORS cho phép Frontend gọi API
-  const isProduction = configService.get<string>('NODE_ENV') === 'production';
-  const allowedOrigins = [frontendUrl.replace(/\/$/, '')]; // Xóa dấu gạch chéo cuối nếu có
+  const allowedOrigins = [
+    frontendUrl.replace(/\/$/, ''),
+    'https://nova-booking-vert.vercel.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173', // Cho Vite nếu cần
+  ];
 
-  if (!isProduction) {
-    allowedOrigins.push('http://localhost:3000', 'http://127.0.0.1:3000');
-  }
+  console.log('🚀 Allowed Origins:', allowedOrigins);
 
   app.enableCors({
     origin: allowedOrigins,
