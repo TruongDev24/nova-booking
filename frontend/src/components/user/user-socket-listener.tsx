@@ -18,7 +18,6 @@ export function UserSocketListener() {
     useEffect(() => {
         if (!socket) return;
 
-        // Listen for manual cancellations from Admin/System
         socket.on("booking_canceled", (data: {
             id: string;
             courtName: string;
@@ -28,22 +27,46 @@ export function UserSocketListener() {
         }) => {
             toast.error("🚨 Thông báo hủy lịch đặt sân", {
                 description: `Đơn tại ${data.courtName} (${data.bookingDate}) đã bị hủy. Lý do: ${data.reason}`,
-                duration: 15000, // Show longer as this is critical info
+                duration: 15000,
                 action: {
                     label: "Xem chi tiết",
                     onClick: () => router.push("/user/bookings"),
                 },
             });
-
-            // 1. Refresh React Query (if used in bookings page)
             queryClient.invalidateQueries({queryKey: ["user-bookings"]});
-
-            // 2. Refresh Server Components
+            window.dispatchEvent(new CustomEvent("refresh_data"));
             router.refresh();
+        });
+
+        socket.on("court_added", (newCourt: { name: string; location: string }) => {
+            toast.success("Một sân cầu lông mới vừa được thêm!", {
+                description: `Sân ${newCourt.name} tại ${newCourt.location} đã sẵn sàng phục vụ.`,
+                duration: 10000,
+            });
+            window.dispatchEvent(new CustomEvent("refresh_data"));
+        });
+
+        socket.on("court_status_changed", (data: { isDeleted: boolean; name: string }) => {
+            if (data.isDeleted) {
+                toast.error(`Sân ${data.name} tạm ngưng hoạt động`, {
+                    description: "Chúng tôi sẽ sớm cập nhật khi sân mở lại.",
+                });
+            } else {
+                toast.success(`Sân ${data.name} đã mở cửa trở lại!`);
+            }
+            window.dispatchEvent(new CustomEvent("refresh_data"));
+        });
+
+        socket.on("court_updated", (updatedCourt: { name: string }) => {
+            toast.info(`Thông tin sân ${updatedCourt.name} vừa được cập nhật.`);
+            window.dispatchEvent(new CustomEvent("refresh_data"));
         });
 
         return () => {
             socket.off("booking_canceled");
+            socket.off("court_added");
+            socket.off("court_status_changed");
+            socket.off("court_updated");
         };
     }, [socket, queryClient, router]);
 

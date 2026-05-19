@@ -32,6 +32,15 @@ export default function AllCourtsPage() {
         void fetchCourts(page, searchTerm);
     }, [page, searchTerm, fetchCourts]);
 
+    // Real-time refresh
+    useEffect(() => {
+        const handleRefresh = () => {
+            void fetchCourts(page, searchTerm);
+        };
+        window.addEventListener("refresh_data", handleRefresh);
+        return () => window.removeEventListener("refresh_data", handleRefresh);
+    }, [fetchCourts, page, searchTerm]);
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         setPage(1);
