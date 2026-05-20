@@ -235,6 +235,16 @@ export default function AdminBookingsPage() {
                     );
                 }
 
+                if (status === "COMPLETED") {
+                    return (
+                        <div className="flex justify-center">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 font-black text-[10px] uppercase">
+                                <CheckCircle2 className="mr-1.5 h-3 w-3" /> Hoàn thành
+                            </Badge>
+                        </div>
+                    );
+                }
+
                 if (status === "CONFIRMED") {
                     return (
                         <div className="flex justify-center">
