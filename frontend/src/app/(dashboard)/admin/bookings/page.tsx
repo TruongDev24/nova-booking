@@ -17,9 +17,11 @@ import {
 } from "lucide-react";
 import { bookingService, Booking } from "@/services/booking.service";
 import { toast } from "sonner";
+import Image from "next/image";
 import { formatToVietnamDate } from "@/lib/date-format";
 import { ColumnDef } from "@tanstack/react-table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSocket } from "@/hooks/use-socket";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,44 @@ export default function AdminBookingsPage() {
 
     const [bookingToConfirm, setBookingToConfirm] = useState<string | null>(null);
     const [bookingToRefund, setBookingToRefund] = useState<Booking | null>(null);
+
+    // --- REAL-TIME UPDATES ---
+    const socket = useSocket();
+    React.useEffect(() => {
+        if (!socket) return;
+
+        const handleBookingChange = (data: { 
+            customerName?: string; 
+            courtName?: string; 
+            totalPrice?: number;
+            [key: string]: unknown; 
+        }) => {
+            console.log("Real-time booking update received:", data);
+            
+            // Show dynamic toast based on event
+            if (data?.customerName) {
+                toast.success(`Đơn hàng mới từ ${data.customerName}!`, {
+                    description: `${data.courtName} - ${data.totalPrice?.toLocaleString() ?? "0"}đ`,
+                    duration: 5000,
+                });
+            } else {
+                toast.info("Dữ liệu đơn hàng vừa có thay đổi.");
+            }
+
+            void queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
+            void queryClient.refetchQueries({ queryKey: ["admin-bookings"] });
+        };
+
+        socket.on("new_booking", handleBookingChange);
+        socket.on("booking_canceled", handleBookingChange);
+        socket.on("booking_initiated", handleBookingChange);
+
+        return () => {
+            socket.off("new_booking", handleBookingChange);
+            socket.off("booking_canceled", handleBookingChange);
+            socket.off("booking_initiated", handleBookingChange);
+        };
+    }, [socket, queryClient]);
 
     // --- React Query: Fetch ---
     const { data: bookingsData, isLoading } = useQuery({
@@ -390,10 +430,11 @@ export default function AdminBookingsPage() {
                             <div className="flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
                                 {bookingToRefund.user?.bankAccountNumber ? (
                                     <div className="relative w-64 h-64 bg-white p-2 rounded-2xl shadow-sm overflow-hidden">
-                                        <img 
+                                        <Image 
                                             src={getVietQRUrl(bookingToRefund)} 
                                             alt="VietQR"
-                                            className="w-full h-full object-contain"
+                                            fill
+                                            className="object-contain"
                                         />
                                     </div>
                                 ) : (

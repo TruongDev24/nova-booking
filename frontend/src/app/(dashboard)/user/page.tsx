@@ -77,9 +77,23 @@ export default function ExploreCourtsPage() {
             }
         });
 
+        socket.on("court_updated", (updatedCourt: Court) => {
+            setCourtsData(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    data: prev.data.map(court =>
+                        court.id === updatedCourt.id ? updatedCourt : court
+                    )
+                };
+            });
+            toast.info(`Thông tin sân ${updatedCourt.name} vừa được cập nhật.`);
+        });
+
         return () => {
             socket.off("court_added");
             socket.off("court_status_changed");
+            socket.off("court_updated");
         };
     }, [socket]);
 

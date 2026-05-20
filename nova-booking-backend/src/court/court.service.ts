@@ -1,6 +1,8 @@
+import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -22,7 +24,23 @@ export class CourtService {
     private cloudinaryService: CloudinaryService,
     private mailerService: MailerService,
     private notificationGateway: NotificationGateway,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
+
+  private async clearCourtCache() {
+    // Clear all court-related cache keys
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const store = (this.cacheManager as any).stores?.[0];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (store && typeof store.keys === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const keys = (await store.keys('courts_*')) as string[];
+      for (const key of keys) {
+        await this.cacheManager.del(key);
+      }
+    }
+    await this.cacheManager.del('all_courts');
+  }
 
   async create(dto: CreateCourtDto, ownerId: string): Promise<Court> {
     const result = await this.prisma.court.create({
@@ -37,7 +55,9 @@ export class CourtService {
       },
     });
 
-    // Trigger 4: Global - Court Added
+    await this.clearCourtCache();
+
+    // Trigger: Global - Court Added
     this.notificationGateway.emitToRoom(
       'room_global_courts',
       'court_added',
@@ -47,10 +67,6 @@ export class CourtService {
     return result;
   }
 
-  /**
-   * Refactored findAll to utilize cached RCM fields (avgRating, reviewCount)
-   * This eliminates the N+1 aggregation performance issue.
-   */
   async findAll(
     user: UserPayload,
     query: PaginationQueryDto,
@@ -65,7 +81,16 @@ export class CourtService {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.max(1, Number(query.limit) || 10);
     const { search, sortBy, sortOrder } = query;
-    const skip = (page - 1) * limit;
+    const cacheKey = `courts_${user.role}_${user.sub}_${page}_${limit}_${search || ''}_${sortBy || ''}_${sortOrder || ''}`;
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const cachedData = await this.cacheManager.get<any>(cacheKey);
+    if (cachedData) {
+      return cachedData as {
+        data: Court[];
+        meta: { total: number; page: number; limit: number; lastPage: number };
+      };
+    }
 
     const where: Prisma.CourtWhereInput = {};
 
@@ -91,18 +116,17 @@ export class CourtService {
     }
 
     try {
-      // One single query to fetch everything, no map/aggregate needed
       const [data, total] = await Promise.all([
         this.prisma.court.findMany({
           where,
-          skip,
+          skip: (page - 1) * limit,
           take: limit,
           orderBy,
         }),
         this.prisma.court.count({ where }),
       ]);
 
-      return {
+      const response = {
         data,
         meta: {
           total,
@@ -111,16 +135,20 @@ export class CourtService {
           lastPage: Math.ceil(total / limit) || 1,
         },
       };
+
+      await this.cacheManager.set(cacheKey, response, 60000); // Cache for 1 minute
+      return response;
     } catch (error) {
       console.error('Prisma FindAll Error:', error);
       throw new BadRequestException('Lỗi truy vấn dữ liệu sân');
     }
   }
 
-  /**
-   * Refactored findOne to use cached RCM fields.
-   */
   async findOne(id: string): Promise<Court> {
+    const cacheKey = `court_detail_${id}`;
+    const cached = await this.cacheManager.get<Court>(cacheKey);
+    if (cached) return cached;
+
     const court = await this.prisma.court.findUnique({
       where: { id },
     });
@@ -129,6 +157,7 @@ export class CourtService {
       throw new NotFoundException(`Sân với ID ${id} không tồn tại`);
     }
 
+    await this.cacheManager.set(cacheKey, court, 60000);
     return court;
   }
 
@@ -158,15 +187,14 @@ export class CourtService {
       data: dto,
     });
 
+    await this.clearCourtCache();
+    await this.cacheManager.del(`court_detail_${id}`);
+
     // Trigger: Court Status Changed
     this.notificationGateway.emitToRoom(
       'room_global_courts',
-      'court_status_changed',
-      {
-        id: result.id,
-        isDeleted: result.isDeleted,
-        name: result.name,
-      },
+      'court_updated',
+      result,
     );
 
     return result;
@@ -217,13 +245,11 @@ export class CourtService {
     const cancelReason = `Sân ${court.name} tạm đóng cửa bảo trì.`;
 
     await this.prisma.$transaction(async (tx) => {
-      // 1. Lock the court
       await tx.court.update({
         where: { id },
         data: { isDeleted: true },
       });
 
-      // 2. Cancel all future bookings with refund logic
       for (const booking of futureBookings) {
         const isPaid = booking.paymentStatus === 'PAID';
         await tx.booking.update({
@@ -236,6 +262,9 @@ export class CourtService {
         });
       }
     });
+
+    await this.clearCourtCache();
+    await this.cacheManager.del(`court_detail_${id}`);
 
     // Trigger: Private Alerts for affected users
     for (const booking of futureBookings) {
@@ -288,16 +317,7 @@ export class CourtService {
         });
       });
 
-      void Promise.allSettled(emailPromises).then((results) => {
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            console.error(
-              `Failed to send apology email to ${futureBookings[index].user.email}:`,
-              result.reason,
-            );
-          }
-        });
-      });
+      void Promise.allSettled(emailPromises);
     }
   }
 
@@ -318,6 +338,9 @@ export class CourtService {
       where: { id },
       data: { isDeleted: false },
     });
+
+    await this.clearCourtCache();
+    await this.cacheManager.del(`court_detail_${id}`);
 
     // Trigger: Global Status Update
     this.notificationGateway.emitToRoom(

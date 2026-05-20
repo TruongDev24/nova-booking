@@ -49,7 +49,7 @@ export default function LoginPage() {
                     } else {
                         router.push("/user");
                     }
-                } catch (e) {
+                } catch {
                     // Ignore parse error
                 }
             }

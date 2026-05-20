@@ -82,6 +82,11 @@ describe('CourtController', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   describe('1. Create & Update (Parsing & Exceptions)', () => {

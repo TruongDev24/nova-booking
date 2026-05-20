@@ -413,6 +413,15 @@ export class BookingService {
         description,
       );
 
+      // 8. Notify Owner in Real-time (Pending)
+      this.notificationGateway.notifyOwner(court.ownerId, 'booking_initiated', {
+        orderCode,
+        courtName: court.name,
+        totalPrice: calculatedTotalPrice,
+        bookingDate: normalizedDate,
+        slots: slots,
+      });
+
       return {
         orderCode,
         checkoutUrl: paymentLink.checkoutUrl,

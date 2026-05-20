@@ -120,7 +120,7 @@ export function DashboardLayout({
     const profileHref = pathname.startsWith("/admin") ? "/admin/profile" : "/user/profile";
     const menuItems = initialMenuItems;
 
-    const roleLabel = userData?.fullName || (pathname.startsWith("/admin") ? "Quản trị viên" : "Khách hàng");
+    const roleLabel = userData?.fullName || initialRoleLabel;
     const userEmail = userData?.email || "...";
 
     const confirmLogout = async () => {

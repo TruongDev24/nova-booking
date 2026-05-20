@@ -75,7 +75,7 @@ export default function RegisterPage() {
                     } else {
                         router.push("/user");
                     }
-                } catch (e) {
+                } catch {
                     // Ignore parse error
                 }
             }
@@ -99,7 +99,7 @@ export default function RegisterPage() {
 
     const onSubmit = async (data: RegisterFormValues) => {
         try {
-            const response = await axios.post<RegisterResponse>(
+            await axios.post<RegisterResponse>(
                 `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/auth/register`,
                 {
                     fullName: data.fullName,

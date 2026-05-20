@@ -78,6 +78,15 @@ export default function MyBookingsPage() {
         return () => clearTimeout(timer);
     }, [fetchBookings]);
 
+    // Real-time refresh
+    useEffect(() => {
+        const handleRefresh = () => {
+            void fetchBookings();
+        };
+        window.addEventListener("refresh_data", handleRefresh);
+        return () => window.removeEventListener("refresh_data", handleRefresh);
+    }, [fetchBookings]);
+
     const handlePayment = async (bookingId: string) => {
         try {
             setIsProcessingPayment(bookingId);

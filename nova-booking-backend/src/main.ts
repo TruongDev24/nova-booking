@@ -21,12 +21,15 @@ async function bootstrap() {
   );
 
   // Bật CORS cho phép Frontend gọi API
-  const isProduction = configService.get<string>('NODE_ENV') === 'production';
-  const allowedOrigins = [frontendUrl.replace(/\/$/, '')]; // Xóa dấu gạch chéo cuối nếu có
+  const allowedOrigins = [
+    frontendUrl.replace(/\/$/, ''),
+    'https://nova-booking-vert.vercel.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173', // Cho Vite nếu cần
+  ];
 
-  if (!isProduction) {
-    allowedOrigins.push('http://localhost:3000', 'http://127.0.0.1:3000');
-  }
+  console.log('🚀 Allowed Origins:', allowedOrigins);
 
   app.enableCors({
     origin: allowedOrigins,
@@ -53,12 +56,19 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  // QUAN TRỌNG: Lắng nghe trên 0.0.0.0 để Docker có thể truy cập
+  // QUAN TRỌNG: Lắng nghe trên 0.0.0.0 để Docker/Render có thể truy cập
   const port = process.env.PORT || 3001;
-  await app.listen(port, '0.0.0.0');
-  console.log(`Backend is running on: http://localhost:${port}`);
+  const host = '0.0.0.0';
+
+  console.log(`🚀 Attempting to start server on ${host}:${port}...`);
+
+  await app.listen(port, host);
+
+  console.log('✅ Nest application successfully started');
+  console.log(`📡 Backend is running on: http://${host}:${port}`);
+  console.log(`📚 Swagger documentation: http://${host}:${port}/api`);
 }
 bootstrap().catch((err) => {
-  console.error(err);
+  console.error('❌ Bootstrap failed:', err);
   process.exit(1);
 });

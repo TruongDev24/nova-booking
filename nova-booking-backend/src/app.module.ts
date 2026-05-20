@@ -13,18 +13,70 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { ReviewModule } from './review/review.module';
 import { PaymentModule } from './payment/payment.module';
 import { NotificationModule } from './notification/notification.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-yet';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 60,
+      },
+    ]),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      useFactory: async (config: ConfigService) => {
+        const redisUrl = config.get<string>('REDIS_URL');
+        console.log('🚀 CacheModule: Initializing with Redis...');
+
+        if (redisUrl) {
+          console.log(
+            '🚀 CacheModule: Using REDIS_URL (SSL/TLS support enabled)',
+          );
+          const store = await redisStore({
+            url: redisUrl,
+            // Render Redis (rediss://) needs TLS enabled
+            socket: redisUrl.startsWith('rediss://')
+              ? { tls: true, rejectUnauthorized: false }
+              : undefined,
+          });
+          return { store };
+        }
+
+        console.log('🚀 CacheModule: Using Host/Port config');
+        const store = await redisStore({
+          socket: {
+            host: config.get('REDIS_HOST', 'localhost'),
+            port: config.get<number>('REDIS_PORT', 6379),
+          },
+          password: config.get('REDIS_PASSWORD'),
+        });
+        return { store };
+      },
+      inject: [ConfigService],
+    }),
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
         const redisUrl = config.get<string>('REDIS_URL');
+        console.log('🚀 BullModule: Initializing with Redis...');
+
         if (redisUrl) {
-          return { connection: { url: redisUrl } };
+          const isSsl = redisUrl.startsWith('rediss://');
+          return {
+            connection: {
+              url: redisUrl,
+              ...(isSsl ? { tls: { rejectUnauthorized: false } } : {}),
+            },
+          };
         }
+
         return {
           connection: {
             host: config.get('REDIS_HOST', 'localhost'),
@@ -38,24 +90,36 @@ import { NotificationModule } from './notification/notification.module';
     RedisModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        transport: {
-          host: 'smtp.gmail.com',
-          port: 465,
-          secure: true, // true for 465, false for other ports
-          auth: {
-            user: config.get('SMTP_USER'),
-            pass: config.get('SMTP_PASS'),
+      useFactory: (config: ConfigService) => {
+        const host = config.get<string>('SMTP_HOST', 'smtp-relay.brevo.com');
+        const port = config.get<number>('SMTP_PORT', 2525);
+        const user = config.get<string>('SMTP_USER');
+        console.log(
+          `🚀 MailerModule: Initializing with host=${host}, port=${port}, user=${user ? 'SET' : 'MISSING'}`,
+        );
+
+        const smtpFrom = config.get<string>('SMTP_FROM');
+        const fromAddress = smtpFrom || `"Nova Booking" <${user}>`;
+
+        return {
+          transport: {
+            host,
+            port: Number(port),
+            secure: Number(port) === 465,
+            auth: {
+              user,
+              pass: config.get<string>('SMTP_PASS'),
+            },
+            tls: {
+              rejectUnauthorized: false,
+              minVersion: 'TLSv1.2',
+            },
           },
-          tls: {
-            rejectUnauthorized: false,
+          defaults: {
+            from: fromAddress,
           },
-          family: 4, // Force IPv4 to avoid connectivity issues
-        },
-        defaults: {
-          from: `"Nova Booking" <${config.get('SMTP_USER')}>`,
-        },
-      }),
+        };
+      },
       inject: [ConfigService],
     }),
     PrismaModule,
@@ -69,6 +133,11 @@ import { NotificationModule } from './notification/notification.module';
     NotificationModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

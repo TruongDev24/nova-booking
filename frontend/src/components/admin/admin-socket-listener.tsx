@@ -38,16 +38,56 @@ export function AdminSocketListener() {
             });
 
             // 2. Refresh Data
-            // Invalidate React Query cache
             queryClient.invalidateQueries({queryKey: ["admin-bookings"]});
-            queryClient.invalidateQueries({queryKey: ["analytics"]});
+            queryClient.invalidateQueries({queryKey: ["admin-analytics"]});
+            window.dispatchEvent(new CustomEvent("refresh_data"));
+            router.refresh();
+        });
 
-            // Force Next.js to re-fetch server components
+        // Listen for manual cancellations from users
+        socket.on("booking_canceled", (data: {
+            id: string;
+            courtName: string;
+            bookingDate: string;
+            startTime: string;
+            reason: string;
+            canceledBy?: string;
+        }) => {
+            toast.error(`⚠️ Khách hàng vừa hủy lịch!`, {
+                description: `Sân ${data.courtName} - ${data.bookingDate} (${data.startTime}). Lý do: ${data.reason}`,
+                duration: 10000,
+                action: {
+                    label: "Xem",
+                    onClick: () => router.push("/admin/bookings"),
+                },
+            });
+            queryClient.invalidateQueries({queryKey: ["admin-bookings"]});
+            queryClient.invalidateQueries({queryKey: ["admin-analytics"]});
+            window.dispatchEvent(new CustomEvent("refresh_data"));
+            router.refresh();
+        });
+
+        // Listen for booking initiated (pending)
+        socket.on("booking_initiated", (data: {
+            orderCode: number;
+            courtName: string;
+            totalPrice: number;
+            bookingDate: string;
+            slots: string[];
+        }) => {
+            toast.info(`⏳ Khách hàng đang thanh toán đơn mới`, {
+                description: `Sân ${data.courtName} - ${data.totalPrice.toLocaleString()}đ.`,
+                duration: 5000,
+            });
+            queryClient.invalidateQueries({queryKey: ["admin-bookings"]});
+            window.dispatchEvent(new CustomEvent("refresh_data"));
             router.refresh();
         });
 
         return () => {
             socket.off("new_booking");
+            socket.off("booking_canceled");
+            socket.off("booking_initiated");
         };
     }, [socket, queryClient, router]);
 

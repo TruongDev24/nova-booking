@@ -14,6 +14,7 @@ import {toast} from "sonner";
 import Image from "next/image";
 import {ColumnDef} from "@tanstack/react-table";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
+import {useSocket} from "@/hooks/use-socket";
 
 import {DataTable} from "@/components/data-table/data-table";
 import {Button} from "@/components/ui/button";
@@ -95,6 +96,37 @@ export default function AdminCourtsPage() {
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const watchAmenities = watch("amenities") || [];
+
+    // --- REAL-TIME UPDATES ---
+    const socket = useSocket();
+    React.useEffect(() => {
+        if (!socket) return;
+
+        const handleCourtChange = (data: { name?: string; [key: string]: unknown }) => {
+            console.log("Real-time court update received:", data);
+            
+            if (data?.name) {
+                toast.info(`Sân "${data.name}" vừa có cập nhật mới!`, {
+                    description: "Dữ liệu đã được đồng bộ.",
+                });
+            } else {
+                toast.info("Thông tin sân vừa được cập nhật.");
+            }
+
+            void queryClient.invalidateQueries({ queryKey: ["courts"] });
+            void queryClient.refetchQueries({ queryKey: ["courts"] });
+        };
+
+        socket.on("court_added", handleCourtChange);
+        socket.on("court_updated", handleCourtChange);
+        socket.on("court_status_changed", handleCourtChange);
+
+        return () => {
+            socket.off("court_added", handleCourtChange);
+            socket.off("court_updated", handleCourtChange);
+            socket.off("court_status_changed", handleCourtChange);
+        };
+    }, [socket, queryClient]);
 
     // --- React Query: Fetch ---
     const {data: courts = [], isLoading} = useQuery({

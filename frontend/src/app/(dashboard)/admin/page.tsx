@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSocket } from "@/hooks/use-socket";
 
 // --- Helpers ---
 const formatCurrency = (value: number) => {
@@ -51,11 +52,31 @@ export default function AdminDashboard() {
     const [period, setPeriod] = useState(7);
 
     // --- Data Fetching with React Query ---
-    const { data, isLoading, isError } = useQuery({
+    const { data, isLoading, isError, refetch } = useQuery({
         queryKey: ["admin-analytics", period],
         queryFn: () => analyticsService.getAdminAnalytics(period),
         refetchOnWindowFocus: false,
     });
+
+    // --- REAL-TIME UPDATES ---
+    const socket = useSocket();
+    React.useEffect(() => {
+        if (!socket) return;
+
+        const handleUpdate = () => {
+            void refetch();
+        };
+
+        socket.on("new_booking", handleUpdate);
+        socket.on("booking_canceled", handleUpdate);
+        socket.on("booking_initiated", handleUpdate);
+
+        return () => {
+            socket.off("new_booking", handleUpdate);
+            socket.off("booking_canceled", handleUpdate);
+            socket.off("booking_initiated", handleUpdate);
+        };
+    }, [socket, refetch]);
 
     if (isLoading) {
         return <DashboardSkeleton />;

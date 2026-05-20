@@ -3,6 +3,7 @@
 import React, { createContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 
 import { usePathname } from "next/navigation";
 
@@ -19,19 +20,38 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     if (!token) {
       if (socket) {
         socket.disconnect();
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSocket(null);
+        // Use a timeout to avoid synchronous setState during render
+        setTimeout(() => setSocket(null), 0);
       }
       return;
     }
 
-    // If socket already exists, don't reconnect
-    if (socket?.connected) return;
+    // Check if token is expired
+    try {
+      const decoded = jwtDecode(token);
+      const currentTime = Date.now() / 1000;
+      if (decoded.exp && decoded.exp < currentTime) {
+        console.warn("Socket connection skipped: JWT expired");
+        if (socket) {
+          socket.disconnect();
+          setTimeout(() => setSocket(null), 0);
+        }
+        return;
+      }
+    } catch {
+      console.error("Invalid token found, skipping socket connection");
+      return;
+    }
+
+    // Only create a new socket if one doesn't exist
+    if (socket) return;
 
     const socketInstance = io(SOCKET_URL, {
       auth: { token },
-      transports: ["websocket"],
-      reconnectionAttempts: 5,
+      transports: ["websocket", "polling"], // Add polling fallback
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
     });
 
     socketInstance.on("connect", () => {
@@ -39,9 +59,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       setSocket(socketInstance);
     });
 
-    socketInstance.on("disconnect", () => {
-      console.log("❌ Real-time system disconnected");
-      setSocket(null);
+    socketInstance.on("disconnect", (reason) => {
+      console.log("❌ Real-time system disconnected:", reason);
+      // Don't set null immediately to avoid aggressive reconnect loops
+      // if it's a temporary network issue
+      if (reason === "io server disconnect") {
+        setSocket(null);
+      }
     });
 
     socketInstance.on("connect_error", (error) => {
@@ -49,11 +73,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
-      socketInstance.disconnect();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSocket(null);
+      if (socketInstance) {
+        socketInstance.disconnect();
+      }
     };
-  }, [pathname]);
+  }, [pathname]); // Removed 'socket' from dependencies
 
   return (
     <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>
