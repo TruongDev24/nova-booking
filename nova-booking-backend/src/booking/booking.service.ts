@@ -467,7 +467,43 @@ export class BookingService {
     }
   }
 
+  async completePastBookings() {
+    const now = new Date();
+    const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const todayStr = vnTime.toISOString().split('T')[0];
+    const currentHour = vnTime.getUTCHours().toString().padStart(2, '0');
+    const currentMin = vnTime.getUTCMinutes().toString().padStart(2, '0');
+    const currentTimeStr = `${currentHour}:${currentMin}`;
+
+    try {
+      const result = await this.prisma.booking.updateMany({
+        where: {
+          status: BookingStatus.CONFIRMED,
+          OR: [
+            { bookingDate: { lt: todayStr } },
+            {
+              bookingDate: todayStr,
+              endTime: { lt: currentTimeStr },
+            },
+          ],
+        },
+        data: {
+          status: BookingStatus.COMPLETED,
+        },
+      });
+
+      if (result.count > 0) {
+        this.logger.log(
+          `Successfully completed ${result.count} past bookings.`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Failed to update past bookings status:', error);
+    }
+  }
+
   async findMyBookings(userId: string) {
+    await this.completePastBookings();
     return this.prisma.booking.findMany({
       where: { userId },
       include: {
@@ -645,6 +681,7 @@ export class BookingService {
     startDate?: string,
     endDate?: string,
   ) {
+    await this.completePastBookings();
     const { page = 1, limit = 10, search, sortBy, sortOrder } = query;
     const skip = (page - 1) * limit;
 
