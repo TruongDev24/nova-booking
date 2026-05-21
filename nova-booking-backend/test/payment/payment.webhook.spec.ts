@@ -13,6 +13,9 @@ import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
 import { Response } from 'express';
 import { NotificationGateway } from '../../src/notification/notification.gateway';
+import { getQueueToken } from '@nestjs/bullmq';
+import { BOOKING_EXPIRATION_QUEUE } from '../../src/booking/booking.constants';
+import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 
 // Mock PayOS
 jest.mock('@payos/node', () => {
@@ -36,6 +39,10 @@ describe('Payment Webhook Integration', () => {
 
   const mockOrderCode = 123456789;
   const mockWebhookBody = { data: { orderCode: mockOrderCode } };
+  const expirationQueue = {
+    add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+    getJob: jest.fn().mockResolvedValue(null),
+  };
 
   beforeEach(async () => {
     prisma = mockDeep<PrismaClient>();
@@ -60,8 +67,15 @@ describe('Payment Webhook Integration', () => {
         { provide: RedisService, useValue: redisService },
         { provide: ConfigService, useValue: configService },
         { provide: NotificationGateway, useValue: notificationGateway },
+        {
+          provide: getQueueToken(BOOKING_EXPIRATION_QUEUE),
+          useValue: expirationQueue,
+        },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     service = module.get<PaymentService>(PaymentService);
     controller = module.get<PaymentController>(PaymentController);

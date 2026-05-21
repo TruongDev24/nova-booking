@@ -1,6 +1,17 @@
-import { Controller, Logger, Post, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Logger,
+  Post,
+  Req,
+  Res,
+  Body,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { Public } from '../common/decorators/public.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { GetUser } from '../common/decorators/get-user.decorator';
 import * as express from 'express';
 
 @Controller('payment')
@@ -8,6 +19,18 @@ export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
   constructor(private readonly paymentService: PaymentService) {}
+
+  @Post('create-link')
+  @UseGuards(JwtAuthGuard)
+  async recreatePaymentLink(
+    @Body() body: { bookingId: string },
+    @GetUser('sub') userId: string,
+  ) {
+    if (!body.bookingId) {
+      throw new BadRequestException('bookingId is required');
+    }
+    return this.paymentService.recreatePaymentLink(body.bookingId, userId);
+  }
 
   @Public()
   @Post('webhook')
