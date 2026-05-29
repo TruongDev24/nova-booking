@@ -4,7 +4,8 @@ import React, {useState} from "react";
 import {
     Plus, Map as MapIcon, Edit, Trash2, X, Loader2,
     Camera,
-    MoreHorizontal
+    MoreHorizontal,
+    Star
 } from "lucide-react";
 import {useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
@@ -15,6 +16,7 @@ import Image from "next/image";
 import {ColumnDef} from "@tanstack/react-table";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {useSocket} from "@/hooks/use-socket";
+import {AdminReviewsDialog} from "@/components/reviews/AdminReviewsDialog";
 
 import {DataTable} from "@/components/data-table/data-table";
 import {Button} from "@/components/ui/button";
@@ -69,6 +71,7 @@ export default function AdminCourtsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCourt, setEditingCourt] = useState<Court | null>(null);
     const [courtToDelete, setCourtToDelete] = useState<string | null>(null);
+    const [activeReviewsCourt, setActiveReviewsCourt] = useState<Court | null>(null);
 
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [previews, setPreviews] = useState<string[]>([]);
@@ -273,6 +276,9 @@ export default function AdminCourtsPage() {
                                 <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => openModal(court)}>
                                     <Edit className="mr-2 h-4 w-4"/> Sửa thông tin
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setActiveReviewsCourt(court)}>
+                                    <Star className="mr-2 h-4 w-4 text-amber-500 fill-amber-500"/> Xem đánh giá
                                 </DropdownMenuItem>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator/>
@@ -603,6 +609,16 @@ export default function AdminCourtsPage() {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {activeReviewsCourt && (
+                <AdminReviewsDialog
+                    key={activeReviewsCourt.id}
+                    courtId={activeReviewsCourt.id}
+                    courtName={activeReviewsCourt.name}
+                    open={!!activeReviewsCourt}
+                    onOpenChange={(open) => !open && setActiveReviewsCourt(null)}
+                />
             )}
         </div>
     );

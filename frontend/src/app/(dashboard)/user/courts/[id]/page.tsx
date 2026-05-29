@@ -21,6 +21,7 @@ import {toast, Toaster} from "react-hot-toast";
 import {useRouter} from "next/navigation";
 import Image from "next/image";
 import {useSocket} from "@/hooks/use-socket";
+import {CourtReviews} from "@/components/reviews/CourtReviews";
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -241,10 +242,10 @@ export default function CourtDetailPage({params}: PageProps) {
                                     <span className="ml-2 text-slate-900 text-sm font-black">
                     {court.avgRating ? court.avgRating.toFixed(1) : "Chưa có đánh giá"}
                   </span>
-                                    {court.totalReviews > 0 && (
+                                    {(court.reviewCount ?? court.totalReviews ?? 0) > 0 && (
                                         <span className="ml-1 text-slate-400 text-sm font-medium">
-                      ({court.totalReviews} đánh giá)
-                    </span>
+                       ({court.reviewCount ?? court.totalReviews} đánh giá)
+                     </span>
                                     )}
                                 </div>
                             </div>
@@ -409,6 +410,13 @@ export default function CourtDetailPage({params}: PageProps) {
                                 </div>
                             </section>
                         )}
+
+                        {/* Reviews Section */}
+                        <CourtReviews
+                            courtId={id}
+                            courtAvgRating={court.avgRating}
+                            courtReviewCount={court.reviewCount ?? court.totalReviews ?? 0}
+                        />
                     </div>
 
                     {/* Right: Booking Engine (4 cols) */}

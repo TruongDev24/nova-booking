@@ -30,9 +30,9 @@ export function CourtCard({ court }: CourtCardProps) {
                     <span className="text-sm font-black text-slate-900">
                         {court.avgRating ? court.avgRating.toFixed(1) : "Chưa có"}
                     </span>
-                    {court.totalReviews > 0 && (
+                    {(court.reviewCount ?? court.totalReviews ?? 0) > 0 && (
                         <span className="text-[10px] text-slate-400 font-bold ml-1">
-                            ({court.totalReviews})
+                            ({court.reviewCount ?? court.totalReviews})
                         </span>
                     )}
                 </div>

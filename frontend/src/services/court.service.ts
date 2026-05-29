@@ -13,6 +13,7 @@ export interface Court {
     ownerId: string;
     avgRating: number;
     totalReviews: number;
+    reviewCount?: number;
     isDeleted: boolean;
 }
 
