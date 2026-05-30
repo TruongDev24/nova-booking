@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Cấu hình tự động kiểm tra nâng cấp thư viện cho FrontEnd (Next.js)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+
+  # Cấu hình tự động kiểm tra nâng cấp thư viện cho BackEnd (Nest.js)
+  - package-ecosystem: "npm"
+    directory: "/nova-booking-backend"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+
+  # Cấu hình tự động kiểm tra nâng cấp phiên bản Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
