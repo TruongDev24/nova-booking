@@ -36,29 +36,22 @@ export class AnalyticsService {
     });
     const courtIds = courts.map((c) => c.id);
 
-    // FETCH ALL BOOKINGS for global metrics to handle inconsistent test data
-    // (In production, we might want to keep this time-bound, but for now we need visibility)
+    // FETCH BOOKINGS with payment and review details
     const allBookings = await this.prisma.booking.findMany({
       where: { courtId: { in: courtIds } },
       include: {
         user: { select: { id: true, fullName: true, phone: true } },
+        payment: { select: { method: true, amount: true } },
+        review: { select: { rating: true, comment: true, createdAt: true } },
       },
     });
 
-    // Filtered by current period for charts
+    // Filtered by current period for calculations and charts
     const periodBookings = allBookings.filter(
       (b) => b.bookingDate >= startDateStr && b.bookingDate <= endDateStr,
     );
 
-    // 3. Logic for SUCCESS (Revenue/Hours)
-    const successAll = allBookings.filter((b) => {
-      const isPaid = b.paymentStatus === 'PAID';
-      const isCompleted = b.status === 'COMPLETED';
-      const isCancelled = b.status === 'CANCELLED';
-      const isRefunded = b.paymentStatus === 'REFUNDED';
-      return (isPaid || isCompleted) && !isCancelled && !isRefunded;
-    });
-
+    // 3. Logic for SUCCESS (Revenue/Hours) - PERIOD BOUND
     const successPeriod = periodBookings.filter((b) => {
       const isPaid = b.paymentStatus === 'PAID';
       const isCompleted = b.status === 'COMPLETED';
@@ -67,22 +60,43 @@ export class AnalyticsService {
       return (isPaid || isCompleted) && !isCancelled && !isRefunded;
     });
 
-    // 4. Aggregations
-    const totalRevenue = successAll.reduce((sum, b) => sum + b.totalPrice, 0);
-    const totalHours = successAll.length;
+    // Helper to calculate hours difference
+    const getBookingHours = (start: string, end: string): number => {
+      try {
+        const [startHour, startMin] = start.split(':').map(Number);
+        const [endHour, endMin] = end.split(':').map(Number);
+        const diff = endHour * 60 + endMin - (startHour * 60 + startMin);
+        return diff > 0 ? diff / 60 : 1;
+      } catch {
+        return 1;
+      }
+    };
 
-    // New Cancellation Rate Logic: Only count bookings that were actually PAID
-    const paidBookings = allBookings.filter(
+    // 4. Aggregations for Overview (Period bound)
+    const totalRevenue = successPeriod.reduce(
+      (sum, b) => sum + b.totalPrice,
+      0,
+    );
+
+    const totalBookedHours = successPeriod.reduce(
+      (sum, b) => sum + getBookingHours(b.startTime, b.endTime),
+      0,
+    );
+
+    // Cancellation Rate for the Period: PAID & then CANCELLED in this period
+    const paidBookingsPeriod = periodBookings.filter(
       (b) =>
         b.paymentStatus === 'PAID' ||
         b.paymentStatus === 'REFUNDED' ||
         b.status === 'COMPLETED',
     );
-    const cancelledPaid = paidBookings.filter((b) => b.status === 'CANCELLED');
+    const cancelledPaidPeriod = paidBookingsPeriod.filter(
+      (b) => b.status === 'CANCELLED',
+    );
 
     const cancellationRate =
-      paidBookings.length > 0
-        ? (cancelledPaid.length / paidBookings.length) * 100
+      paidBookingsPeriod.length > 0
+        ? (cancelledPaidPeriod.length / paidBookingsPeriod.length) * 100
         : 0;
 
     // Occupancy Rate (For the period)
@@ -102,7 +116,11 @@ export class AnalyticsService {
         ? (successPeriod.length / totalAvailableSlotsPeriod) * 100
         : 0;
 
-    // 5. Revenue Trend (CHART MUST REMAIN PERIOD-BOUND)
+    const totalBookings = successPeriod.length;
+    const aov = totalBookings > 0 ? totalRevenue / totalBookings : 0;
+    const activeCustomers = new Set(successPeriod.map((b) => b.userId)).size;
+
+    // 5. Revenue Trend (CHART - PERIOD-BOUND)
     const revenueMap = new Map<string, number>();
     for (let i = 0; i < period; i++) {
       const d = new Date(startDate);
@@ -125,26 +143,47 @@ export class AnalyticsService {
       }),
     );
 
-    // 6. Court Perf (ALL time for better visibility)
-    const courtPerfMap = new Map<
-      string,
-      { courtName: string; revenue: number; bookings: number }
-    >();
-    courts.forEach((c) => {
-      courtPerfMap.set(c.id, { courtName: c.name, revenue: 0, bookings: 0 });
+    // 6. Court Performance (Period bound)
+    const courtPerf = courts.map((c) => {
+      const successCourtPeriod = successPeriod.filter(
+        (b) => b.courtId === c.id,
+      );
+      const revenue = successCourtPeriod.reduce(
+        (sum, b) => sum + b.totalPrice,
+        0,
+      );
+      const bookings = successCourtPeriod.length;
+
+      const bookedHours = successCourtPeriod.reduce(
+        (sum, b) => sum + getBookingHours(b.startTime, b.endTime),
+        0,
+      );
+
+      const openHour =
+        parseInt((c.openingTime || '05:00').split(':')[0], 10) || 5;
+      let closeHour =
+        parseInt((c.closingTime || '22:00').split(':')[0], 10) || 22;
+      if (closeHour <= openHour) closeHour += 24;
+      const dailySlots = Math.max(0, closeHour - openHour);
+      const availableSlots = dailySlots * period;
+      const occupancyRate =
+        availableSlots > 0
+          ? (successCourtPeriod.length / availableSlots) * 100
+          : 0;
+
+      return {
+        courtName: c.name,
+        revenue,
+        bookings,
+        bookedHours: Math.round(bookedHours * 100) / 100,
+        occupancyRate: Math.round(occupancyRate * 100) / 100,
+        avgRating: c.avgRating || 0,
+      };
     });
 
-    successAll.forEach((b) => {
-      const perf = courtPerfMap.get(b.courtId);
-      if (perf) {
-        perf.revenue += b.totalPrice;
-        perf.bookings += 1;
-      }
-    });
-
-    // 7. VIP Customers (ALL time)
+    // 7. VIP Customers (Period bound)
     const userMap = new Map<string, VipCustomer>();
-    successAll.forEach((b) => {
+    successPeriod.forEach((b) => {
       if (!b.user) return;
       const existing = userMap.get(b.userId);
       if (existing) {
@@ -161,6 +200,10 @@ export class AnalyticsService {
       }
     });
 
+    const topVipCustomers = Array.from(userMap.values())
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 10);
+
     // 8. Peak Hours (Period bound for current trends)
     const hourMap = new Map<number, number>();
     for (let h = 0; h < 24; h++) hourMap.set(h, 0);
@@ -171,23 +214,125 @@ export class AnalyticsService {
       }
     });
 
+    const peakHours = Array.from(hourMap.entries()).map(([hour, count]) => ({
+      hour: `${hour.toString().padStart(2, '0')}h`,
+      count,
+    }));
+
+    // 9. Payment Methods stats (Period bound)
+    const paymentMethodStatsMap = new Map<
+      string,
+      { count: number; amount: number }
+    >();
+    paymentMethodStatsMap.set('CASH', { count: 0, amount: 0 });
+    paymentMethodStatsMap.set('BANK_TRANSFER', { count: 0, amount: 0 });
+    paymentMethodStatsMap.set('E_WALLET', { count: 0, amount: 0 });
+
+    successPeriod.forEach((b) => {
+      const method = b.payment?.method || 'CASH';
+      const stats = paymentMethodStatsMap.get(method) || {
+        count: 0,
+        amount: 0,
+      };
+      stats.count += 1;
+      stats.amount += b.totalPrice;
+      paymentMethodStatsMap.set(method, stats);
+    });
+
+    const paymentMethods = Array.from(paymentMethodStatsMap.entries()).map(
+      ([method, stats]) => ({
+        method,
+        count: stats.count,
+        amount: stats.amount,
+      }),
+    );
+
+    // 10. Weekly Booking Density (Period bound)
+    const dayNames = [
+      'Chủ Nhật',
+      'Thứ Hai',
+      'Thứ Ba',
+      'Thứ Tư',
+      'Thứ Năm',
+      'Thứ Sáu',
+      'Thứ Bảy',
+    ];
+    const weeklyMap = new Map<number, number>();
+    for (let i = 0; i < 7; i++) weeklyMap.set(i, 0);
+
+    successPeriod.forEach((b) => {
+      const parts = b.bookingDate.split('-').map(Number);
+      if (parts.length === 3) {
+        const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+        const dayIdx = dateObj.getDay();
+        weeklyMap.set(dayIdx, (weeklyMap.get(dayIdx) || 0) + 1);
+      }
+    });
+
+    const weeklyDensity = Array.from(weeklyMap.entries()).map(
+      ([dayIdx, count]) => ({
+        day: dayNames[dayIdx],
+        count,
+      }),
+    );
+    const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Thứ Hai -> Chủ Nhật
+    weeklyDensity.sort(
+      (a, b) =>
+        dayOrder.indexOf(dayNames.indexOf(a.day)) -
+        dayOrder.indexOf(dayNames.indexOf(b.day)),
+    );
+
+    // 11. Cancel Reasons analysis (Period bound)
+    const cancelReasonsMap = new Map<string, number>();
+    const cancelledPeriod = periodBookings.filter(
+      (b) => b.status === 'CANCELLED',
+    );
+    cancelledPeriod.forEach((b) => {
+      const reason = b.cancelReason?.trim() || 'Khác / Không nêu lý do';
+      cancelReasonsMap.set(reason, (cancelReasonsMap.get(reason) || 0) + 1);
+    });
+
+    const cancelReasons = Array.from(cancelReasonsMap.entries())
+      .map(([reason, count]) => ({
+        reason,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // 12. Recent Reviews (Period bound)
+    const recentReviews = periodBookings
+      .filter((b) => b.review)
+      .map((b) => ({
+        bookingId: b.id,
+        courtName: courts.find((c) => c.id === b.courtId)?.name || 'Sân ẩn',
+        userName: b.user?.fullName || 'Khách hàng',
+        rating: b.review?.rating || 0,
+        comment: b.review?.comment || '',
+        bookingDate: b.bookingDate,
+      }))
+      .sort((a, b) => b.bookingDate.localeCompare(a.bookingDate))
+      .slice(0, 10);
+
     return {
       overview: {
         totalRevenue,
-        totalBookedHours: totalHours,
+        totalBookedHours: Math.round(totalBookedHours * 100) / 100,
         occupancyRate: Math.round(occupancyRate * 100) / 100,
         cancelRate: Math.round(cancellationRate * 100) / 100,
+        totalBookings,
+        aov: Math.round(aov),
+        activeCustomers,
         debugId: Date.now(),
       },
       revenueChart: revenueTrend,
-      courtPerformance: Array.from(courtPerfMap.values()),
-      topVipCustomers: Array.from(userMap.values())
-        .sort((a, b) => b.totalSpent - a.totalSpent)
-        .slice(0, 10),
-      peakHours: Array.from(hourMap.entries()).map(([hour, count]) => ({
-        hour: `${hour.toString().padStart(2, '0')}h`,
-        count,
-      })),
+      courtPerformance: courtPerf,
+      topVipCustomers,
+      peakHours,
+      paymentMethods,
+      weeklyDensity,
+      cancelReasons,
+      recentReviews,
     };
   }
 }

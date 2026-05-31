@@ -20,6 +20,9 @@ export interface CourtPerformance {
     courtName: string;
     revenue: number;
     bookings: number;
+    bookedHours: number;
+    occupancyRate: number;
+    avgRating: number;
 }
 
 export interface AnalyticsOverview {
@@ -27,6 +30,34 @@ export interface AnalyticsOverview {
     totalBookedHours: number;
     occupancyRate: number;
     cancelRate: number;
+    totalBookings: number;
+    aov: number;
+    activeCustomers: number;
+}
+
+export interface PaymentMethodStats {
+    method: string;
+    count: number;
+    amount: number;
+}
+
+export interface WeeklyDensityStats {
+    day: string;
+    count: number;
+}
+
+export interface CancelReasonStats {
+    reason: string;
+    count: number;
+}
+
+export interface RecentReviewStats {
+    bookingId: string;
+    courtName: string;
+    userName: string;
+    rating: number;
+    comment: string;
+    bookingDate: string;
 }
 
 export interface AnalyticsResponse {
@@ -35,4 +66,9 @@ export interface AnalyticsResponse {
     courtPerformance: CourtPerformance[];
     topVipCustomers: VipCustomer[];
     peakHours: PeakHour[];
+    paymentMethods: PaymentMethodStats[];
+    weeklyDensity: WeeklyDensityStats[];
+    cancelReasons: CancelReasonStats[];
+    recentReviews: RecentReviewStats[];
 }
+
