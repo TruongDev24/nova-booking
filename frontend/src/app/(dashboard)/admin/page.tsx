@@ -57,15 +57,61 @@ const formatPercent = (value: number) => {
 };
 
 export default function AdminDashboard() {
-    const [period, setPeriod] = useState<number>(7);
+    const getInitialDates = () => {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Ho_Chi_Minh",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        });
+        const end = formatter.format(now);
+        const start = new Date(now);
+        start.setDate(now.getDate() - 6); // 7 days including today
+        return { start: formatter.format(start), end };
+    };
+
+    const initialDates = getInitialDates();
+    const [startDate, setStartDate] = useState<string>(initialDates.start);
+    const [endDate, setEndDate] = useState<string>(initialDates.end);
     const [activeTab, setActiveTab] = useState<string>("overview");
 
     // --- Data Fetching with React Query ---
     const { data, isLoading, isError, refetch } = useQuery({
-        queryKey: ["admin-analytics", period],
-        queryFn: () => analyticsService.getAdminAnalytics(period),
+        queryKey: ["admin-analytics", startDate, endDate],
+        queryFn: () => analyticsService.getAdminAnalytics(undefined, startDate || undefined, endDate || undefined),
         refetchOnWindowFocus: false,
     });
+
+    const handlePreset = (days: number) => {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Ho_Chi_Minh",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        });
+        const end = formatter.format(now);
+        const start = new Date(now);
+        start.setDate(now.getDate() - days + 1);
+        setStartDate(formatter.format(start));
+        setEndDate(end);
+    };
+
+    const isPresetActive = (days: number) => {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Ho_Chi_Minh",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        });
+        const end = formatter.format(now);
+        const start = new Date(now);
+        start.setDate(now.getDate() - days + 1);
+        const expectedStart = formatter.format(start);
+        return startDate === expectedStart && endDate === end;
+    };
 
     // --- REAL-TIME UPDATES ---
     const socket = useSocket();
@@ -219,27 +265,50 @@ export default function AdminDashboard() {
                     </p>
                 </div>
 
-                <div className="flex items-center self-start md:self-auto gap-2 p-1 bg-muted/40 border rounded-2xl shadow-sm">
-                    <Button
-                        variant={period === 7 ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setPeriod(7)}
-                        className={`text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
-                            period === 7 ? "shadow-md shadow-primary/20" : ""
-                        }`}
-                    >
-                        7 ngày qua
-                    </Button>
-                    <Button
-                        variant={period === 30 ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setPeriod(30)}
-                        className={`text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
-                            period === 30 ? "shadow-md shadow-primary/20" : ""
-                        }`}
-                    >
-                        30 ngày qua
-                    </Button>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-1.5 bg-muted/30 border border-muted/50 rounded-2xl shadow-sm w-full md:w-auto">
+                    {/* Presets */}
+                    <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl">
+                        <Button
+                            variant={isPresetActive(7) ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => handlePreset(7)}
+                            className={`text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                                isPresetActive(7) ? "shadow-sm shadow-primary/10" : ""
+                            }`}
+                        >
+                            7 ngày
+                        </Button>
+                        <Button
+                            variant={isPresetActive(30) ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => handlePreset(30)}
+                            className={`text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                                isPresetActive(30) ? "shadow-sm shadow-primary/10" : ""
+                            }`}
+                        >
+                            30 ngày
+                        </Button>
+                    </div>
+
+                    {/* Date Inputs */}
+                    <div className="flex items-center gap-2 text-xs font-black text-muted-foreground w-full sm:w-auto justify-between sm:justify-start">
+                        <span className="uppercase tracking-wider text-[8px]">Từ</span>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            max={endDate || undefined}
+                            className="bg-background text-foreground border border-muted/35 px-2 py-1 rounded-lg text-xs font-bold focus:outline-none focus:border-primary transition-colors"
+                        />
+                        <span className="uppercase tracking-wider text-[8px]">Đến</span>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            min={startDate || undefined}
+                            className="bg-background text-foreground border border-muted/35 px-2 py-1 rounded-lg text-xs font-bold focus:outline-none focus:border-primary transition-colors"
+                        />
+                    </div>
                 </div>
             </div>
 

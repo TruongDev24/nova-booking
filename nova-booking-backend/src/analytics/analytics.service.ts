@@ -11,7 +11,9 @@ export class AnalyticsService {
 
   async getAdminAnalytics(
     userId: string,
-    period: number = 7,
+    period?: number,
+    startDateParam?: string,
+    endDateParam?: string,
   ): Promise<AnalyticsResponse> {
     // 1. Date Range Handling (Vietnam Timezone)
     const getVNDateString = (date: Date) => {
@@ -24,11 +26,41 @@ export class AnalyticsService {
       return formatter.format(date);
     };
 
-    const now = new Date();
-    const endDateStr = getVNDateString(now);
-    const startDate = new Date(now);
-    startDate.setDate(now.getDate() - period + 1);
-    const startDateStr = getVNDateString(startDate);
+    const getDaysDiff = (startStr: string, endStr: string): number => {
+      try {
+        const startParts = startStr.split('-').map(Number);
+        const endParts = endStr.split('-').map(Number);
+        if (startParts.length === 3 && endParts.length === 3) {
+          const startDateObj = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+          const endDateObj = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+          const diffTime = endDateObj.getTime() - startDateObj.getTime();
+          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+          return isNaN(diffDays) || diffDays < 0 ? 7 : diffDays + 1;
+        }
+      } catch {
+        return 7;
+      }
+      return 7;
+    };
+
+    let startDateStr: string;
+    let endDateStr: string;
+    let periodDays = period || 7;
+
+    if (startDateParam && endDateParam) {
+      startDateStr = startDateParam;
+      endDateStr = endDateParam;
+      periodDays = getDaysDiff(startDateParam, endDateParam);
+    } else {
+      const now = new Date();
+      endDateStr = getVNDateString(now);
+      const startDateObj = new Date(now);
+      startDateObj.setDate(now.getDate() - periodDays + 1);
+      startDateStr = getVNDateString(startDateObj);
+    }
+
+    const startParts = startDateStr.split('-').map(Number);
+    const startDate = new Date(startParts[0], startParts[1] - 1, startParts[2]);
 
     // 2. Fetch Base Data
     const courts = await this.prisma.court.findMany({
@@ -108,7 +140,7 @@ export class AnalyticsService {
         parseInt((court.closingTime || '22:00').split(':')[0], 10) || 22;
       if (closeHour <= openHour) closeHour += 24;
       const dailySlots = Math.max(0, closeHour - openHour);
-      totalAvailableSlotsPeriod += dailySlots * period;
+      totalAvailableSlotsPeriod += dailySlots * periodDays;
     });
 
     const occupancyRate =
@@ -122,7 +154,7 @@ export class AnalyticsService {
 
     // 5. Revenue Trend (CHART - PERIOD-BOUND)
     const revenueMap = new Map<string, number>();
-    for (let i = 0; i < period; i++) {
+    for (let i = 0; i < periodDays; i++) {
       const d = new Date(startDate);
       d.setDate(startDate.getDate() + i);
       const dStr = getVNDateString(d);
@@ -165,7 +197,7 @@ export class AnalyticsService {
         parseInt((c.closingTime || '22:00').split(':')[0], 10) || 22;
       if (closeHour <= openHour) closeHour += 24;
       const dailySlots = Math.max(0, closeHour - openHour);
-      const availableSlots = dailySlots * period;
+      const availableSlots = dailySlots * periodDays;
       const occupancyRate =
         availableSlots > 0
           ? (successCourtPeriod.length / availableSlots) * 100

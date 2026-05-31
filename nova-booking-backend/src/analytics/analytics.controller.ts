@@ -17,12 +17,14 @@ export class AnalyticsController {
   async getAnalytics(
     @Req() req: Request & { user: UserPayload },
     @Query('period') period?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     const userId = req.user.sub;
-    const days = period ? parseInt(period, 10) : 7;
+    const days = period ? parseInt(period, 10) : undefined;
     console.log(
-      `[AnalyticsController] Fetching analytics for user ${userId}, period: ${days} days`,
+      `[AnalyticsController] Fetching analytics for user ${userId}, period: ${period}, range: ${startDate} to ${endDate}`,
     );
-    return this.analyticsService.getAdminAnalytics(userId, days);
+    return this.analyticsService.getAdminAnalytics(userId, days, startDate, endDate);
   }
 }
