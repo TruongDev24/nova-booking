@@ -78,17 +78,21 @@ export function DataTable<TData, TValue>({
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center flex-1 max-w-sm relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"/>
-                    <Input
-                        placeholder={searchPlaceholder}
-                        value={searchKey ? (table.getColumn(searchKey)?.getFilterValue() as string) ?? "" : ""}
-                        onChange={(event) =>
-                            searchKey && table.getColumn(searchKey)?.setFilterValue(event.target.value)
-                        }
-                        className="pl-9 bg-background"
-                    />
-                </div>
+                {searchKey ? (
+                    <div className="flex items-center flex-1 max-w-sm relative">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"/>
+                        <Input
+                            placeholder={searchPlaceholder}
+                            value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+                            onChange={(event) =>
+                                table.getColumn(searchKey)?.setFilterValue(event.target.value)
+                            }
+                            className="pl-9 bg-background"
+                        />
+                    </div>
+                ) : (
+                    <div />
+                )}
                 <DropdownMenu>
                     <DropdownMenuTrigger
                         render={<Button variant="outline" size="sm" className="ml-auto flex h-10 gap-2 px-3"/>}>

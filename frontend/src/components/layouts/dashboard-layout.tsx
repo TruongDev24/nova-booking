@@ -167,8 +167,12 @@ export function DashboardLayout({
                 label = titleOverride || "Chi tiết";
             } else if (label === "User") {
                 label = "Người dùng";
+            } else if (label === "Admin") {
+                label = "Tổng quan";
             } else if (label === "Courts") {
                 label = "Sân bóng";
+            } else if (label === "Bookings") {
+                label = "Đơn đặt sân";
             } else if (label === "Profile") {
                 label = "Hồ sơ";
             }

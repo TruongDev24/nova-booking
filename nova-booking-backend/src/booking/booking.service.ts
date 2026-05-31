@@ -699,28 +699,37 @@ export class BookingService {
     }
 
     // Date Range Filtering
-    if (startDate || endDate) {
+    const start = startDate?.trim();
+    const end = endDate?.trim();
+    if (start || end) {
       const dateFilter: Prisma.StringFilter = {};
-      if (startDate) dateFilter.gte = startDate;
-      if (endDate) dateFilter.lte = endDate;
+      if (start) dateFilter.gte = start;
+      if (end) dateFilter.lte = end;
       where.bookingDate = dateFilter;
     }
 
     if (search && search.trim()) {
+      const cleanSearch = search.trim().startsWith('#')
+        ? search.trim().slice(1)
+        : search.trim();
+
       where.OR = [
         {
+          id: { contains: cleanSearch, mode: 'insensitive' },
+        },
+        {
           user: {
-            fullName: { contains: search, mode: 'insensitive' },
+            fullName: { contains: cleanSearch, mode: 'insensitive' },
           },
         },
         {
           user: {
-            phone: { contains: search },
+            phone: { contains: cleanSearch },
           },
         },
         {
           court: {
-            name: { contains: search, mode: 'insensitive' },
+            name: { contains: cleanSearch, mode: 'insensitive' },
           },
         },
       ];

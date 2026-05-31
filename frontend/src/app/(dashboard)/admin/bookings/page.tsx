@@ -56,6 +56,14 @@ export default function AdminBookingsPage() {
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
 
+    const handleViewChange = (newView: "all" | "refunds") => {
+        setView(newView);
+        setSearch("");
+        setStatus("");
+        setStartDate("");
+        setEndDate("");
+    };
+
     const [bookingToConfirm, setBookingToConfirm] = useState<string | null>(null);
     const [bookingToRefund, setBookingToRefund] = useState<Booking | null>(null);
 
@@ -333,16 +341,16 @@ export default function AdminBookingsPage() {
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight uppercase italic">QUẢN LÝ ĐẶT SÂN</h1>
+                    <h1 className="text-3xl font-black tracking-tight uppercase italic">QUẢN LÝ ĐƠN ĐẶT SÂN</h1>
                     <div className="flex items-center gap-4 mt-2">
                         <button 
-                            onClick={() => setView("all")}
+                            onClick={() => handleViewChange("all")}
                             className={`text-sm font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all ${view === "all" ? "bg-slate-900 text-white" : "text-slate-400 hover:text-slate-600"}`}
                         >
                             Tất cả đơn
                         </button>
                         <button 
-                            onClick={() => setView("refunds")}
+                            onClick={() => handleViewChange("refunds")}
                             className={`text-sm font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all flex items-center gap-2 ${view === "refunds" ? "bg-rose-600 text-white shadow-lg shadow-rose-100" : "text-slate-400 hover:text-slate-600"}`}
                         >
                             <Wallet className="w-4 h-4" /> Chờ hoàn tiền
@@ -382,11 +390,12 @@ export default function AdminBookingsPage() {
                         <select
                             value={status}
                             onChange={(e) => setStatus(e.target.value)}
-                            className="h-12 px-4 bg-muted/30 border border-transparent rounded-xl outline-none focus:border-primary font-bold text-xs cursor-pointer"
+                            className="h-12 px-4 bg-muted/30 border border-transparent rounded-xl outline-none focus:border-primary font-bold text-xs cursor-pointer text-foreground"
                         >
-                            <option value="">Trạng thái</option>
+                            <option value="" className="text-muted-foreground">Trạng thái</option>
                             <option value="PENDING">Chờ xử lý</option>
-                            <option value="CONFIRMED">Thành công</option>
+                            <option value="CONFIRMED">Thành công (Sắp diễn ra)</option>
+                            <option value="COMPLETED">Đã hoàn thành</option>
                             <option value="CANCELLED">Đã hủy</option>
                         </select>
                         <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-transparent focus-within:border-primary">
