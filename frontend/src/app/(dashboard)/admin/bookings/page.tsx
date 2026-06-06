@@ -22,6 +22,7 @@ import { formatToVietnamDate } from "@/lib/date-format";
 import { ColumnDef } from "@tanstack/react-table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSocket } from "@/hooks/use-socket";
+import { useLanguage } from "@/context/language-context";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ import {
 
 export default function AdminBookingsPage() {
     const queryClient = useQueryClient();
+    const { t } = useLanguage();
     const [view, setView] = useState<"all" | "refunds">("all");
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState<string>("");
@@ -133,10 +135,10 @@ export default function AdminBookingsPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
             setBookingToConfirm(null);
-            toast.success("Đã xác nhận đơn hàng!");
+            toast.success(t("bookings.confirmSuccess"));
         },
         onError: (error: { response?: { data?: { message?: string } } }) => {
-            const message = error.response?.data?.message || "Lỗi khi xác nhận đơn hàng";
+            const message = error.response?.data?.message || t("bookings.confirmError");
             toast.error(message);
         }
     });
@@ -147,10 +149,10 @@ export default function AdminBookingsPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
             setBookingToRefund(null);
-            toast.success("Hoàn tiền thành công!");
+            toast.success(t("bookings.refundSuccess"));
         },
         onError: (error: { response?: { data?: { message?: string } } }) => {
-            const message = error.response?.data?.message || "Lỗi khi cập nhật trạng thái hoàn tiền";
+            const message = error.response?.data?.message || t("bookings.refundError");
             toast.error(message);
         }
     });
@@ -166,7 +168,7 @@ export default function AdminBookingsPage() {
     const columns: ColumnDef<Booking>[] = [
         {
             accessorKey: "id",
-            header: "Mã đơn",
+            header: t("bookings.code"),
             cell: ({ row }) => (
                 <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">
                     #{row.original.id.slice(-6)}
@@ -175,7 +177,7 @@ export default function AdminBookingsPage() {
         },
         {
             id: "customer",
-            header: "Khách hàng",
+            header: t("bookings.customer"),
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="text-sm font-bold tracking-tight">{row.original.user?.fullName}</span>
@@ -185,7 +187,7 @@ export default function AdminBookingsPage() {
         },
         {
             id: "court",
-            header: "Sân vận động",
+            header: t("bookings.court"),
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="text-sm font-bold text-foreground">{row.original.court?.name}</span>
@@ -197,7 +199,7 @@ export default function AdminBookingsPage() {
         },
         {
             id: "schedule",
-            header: "Lịch hẹn",
+            header: t("bookings.schedule"),
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="text-sm font-bold">{formatToVietnamDate(row.original.bookingDate)}</span>
@@ -209,7 +211,7 @@ export default function AdminBookingsPage() {
         },
         {
             accessorKey: "totalPrice",
-            header: () => <div className="text-right">Thanh toán</div>,
+            header: () => <div className="text-right">{t("bookings.payment")}</div>,
             cell: ({ row }) => (
                 <div className="text-right font-black text-lg">
                     {row.original.totalPrice.toLocaleString()}đ
@@ -218,7 +220,7 @@ export default function AdminBookingsPage() {
         },
         {
             accessorKey: "status",
-            header: () => <div className="text-center">Trạng thái</div>,
+            header: () => <div className="text-center">{t("bookings.status")}</div>,
             cell: ({ row }) => {
                 const status = row.original.status;
                 const refund = row.original.refundStatus;
@@ -226,8 +228,8 @@ export default function AdminBookingsPage() {
                 if (status === "CANCELLED" && refund === "PENDING") {
                     return (
                         <div className="flex justify-center">
-                            <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 font-black text-[10px] uppercase animate-pulse">
-                                <Wallet className="mr-1.5 h-3 w-3" /> Chờ hoàn tiền
+                            <Badge variant="outline" className="bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/30 font-black text-[10px] uppercase animate-pulse">
+                                <Wallet className="mr-1.5 h-3 w-3" /> {t("bookings.statusRefundPending")}
                             </Badge>
                         </div>
                     );
@@ -236,8 +238,8 @@ export default function AdminBookingsPage() {
                 if (refund === "COMPLETED") {
                     return (
                         <div className="flex justify-center">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 font-black text-[10px] uppercase">
-                                <CheckCircle2 className="mr-1.5 h-3 w-3" /> Đã hoàn tiền
+                            <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/30 font-black text-[10px] uppercase">
+                                <CheckCircle2 className="mr-1.5 h-3 w-3" /> {t("bookings.statusRefundCompleted")}
                             </Badge>
                         </div>
                     );
@@ -246,8 +248,8 @@ export default function AdminBookingsPage() {
                 if (status === "COMPLETED") {
                     return (
                         <div className="flex justify-center">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 font-black text-[10px] uppercase">
-                                <CheckCircle2 className="mr-1.5 h-3 w-3" /> Hoàn thành
+                            <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/30 font-black text-[10px] uppercase">
+                                <CheckCircle2 className="mr-1.5 h-3 w-3" /> {t("bookings.statusCompleted")}
                             </Badge>
                         </div>
                     );
@@ -256,8 +258,8 @@ export default function AdminBookingsPage() {
                 if (status === "CONFIRMED") {
                     return (
                         <div className="flex justify-center">
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 font-black text-[10px] uppercase">
-                                <CheckCircle2 className="mr-1.5 h-3 w-3" /> Thành công
+                            <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30 font-black text-[10px] uppercase">
+                                <CheckCircle2 className="mr-1.5 h-3 w-3" /> {t("bookings.statusConfirmed")}
                             </Badge>
                         </div>
                     );
@@ -266,8 +268,8 @@ export default function AdminBookingsPage() {
                 if (status === "CANCELLED") {
                     return (
                         <div className="flex justify-center">
-                            <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 font-black text-[10px] uppercase">
-                                <XCircle className="mr-1.5 h-3 w-3" /> Đã hủy
+                            <Badge variant="outline" className="bg-destructive/10 dark:bg-destructive/20 text-destructive border-destructive/20 font-black text-[10px] uppercase">
+                                <XCircle className="mr-1.5 h-3 w-3" /> {t("bookings.statusCancelled")}
                             </Badge>
                         </div>
                     );
@@ -275,8 +277,8 @@ export default function AdminBookingsPage() {
                 
                 return (
                     <div className="flex justify-center">
-                        <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 font-black text-[10px] uppercase">
-                            <Clock className="mr-1.5 h-3 w-3" /> Chờ xử lý
+                        <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/30 font-black text-[10px] uppercase">
+                            <Clock className="mr-1.5 h-3 w-3" /> {t("bookings.statusPending")}
                         </Badge>
                     </div>
                 );
@@ -284,7 +286,7 @@ export default function AdminBookingsPage() {
         },
         {
             id: "reason",
-            header: "Lý do",
+            header: t("bookings.reason"),
             cell: ({ row }) => (
                 <div className="max-w-[150px]">
                     <span className="text-[11px] text-muted-foreground italic font-medium">
@@ -305,10 +307,10 @@ export default function AdminBookingsPage() {
                             <Button 
                                 size="sm" 
                                 variant="outline" 
-                                className="h-8 rounded-lg bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100 font-bold text-xs"
+                                className="h-8 rounded-lg bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/30 hover:bg-rose-500/20 font-bold text-xs cursor-pointer active:scale-95 transition-all"
                                 onClick={() => setBookingToRefund(booking)}
                             >
-                                <QrCode className="mr-2 h-3 w-3" /> Hoàn tiền
+                                <QrCode className="mr-2 h-3 w-3" /> {t("bookings.refund")}
                             </Button>
                         )}
                         
@@ -321,9 +323,9 @@ export default function AdminBookingsPage() {
                                 } />
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuGroup>
-                                        <DropdownMenuLabel>Thao tác đơn</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => setBookingToConfirm(booking.id)}>
-                                            <Check className="mr-2 h-4 w-4 text-emerald-500" /> Xác nhận đơn
+                                        <DropdownMenuLabel>{t("bookings.orderActions")}</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => setBookingToConfirm(booking.id)} className="cursor-pointer">
+                                            <Check className="mr-2 h-4 w-4 text-emerald-500" /> {t("bookings.confirmOrder")}
                                         </DropdownMenuItem>
                                     </DropdownMenuGroup>
                                 </DropdownMenuContent>
@@ -341,36 +343,36 @@ export default function AdminBookingsPage() {
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight uppercase italic">QUẢN LÝ ĐƠN ĐẶT SÂN</h1>
+                    <h1 className="text-3xl font-black tracking-tight uppercase italic">{t("bookings.title")}</h1>
                     <div className="flex items-center gap-4 mt-2">
                         <button 
                             onClick={() => handleViewChange("all")}
-                            className={`text-sm font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all ${view === "all" ? "bg-slate-900 text-white" : "text-slate-400 hover:text-slate-600"}`}
+                            className={`text-sm font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all cursor-pointer ${view === "all" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
                         >
-                            Tất cả đơn
+                            {t("bookings.allBookings")}
                         </button>
                         <button 
                             onClick={() => handleViewChange("refunds")}
-                            className={`text-sm font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all flex items-center gap-2 ${view === "refunds" ? "bg-rose-600 text-white shadow-lg shadow-rose-100" : "text-slate-400 hover:text-slate-600"}`}
+                            className={`text-sm font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all flex items-center gap-2 cursor-pointer ${view === "refunds" ? "bg-rose-600 text-white shadow-lg shadow-rose-600/20" : "text-muted-foreground hover:text-foreground"}`}
                         >
-                            <Wallet className="w-4 h-4" /> Chờ hoàn tiền
+                            <Wallet className="w-4 h-4" /> {t("bookings.pendingRefunds")}
                         </button>
                     </div>
                 </div>
                 <div className="bg-card border rounded-2xl px-6 py-4 flex items-center gap-8 shadow-sm">
                     <div className="flex flex-col text-right">
                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">
-                            {view === "all" ? "Tổng đơn hàng" : "Cần hoàn tiền"}
+                            {view === "all" ? t("bookings.totalBookings") : t("bookings.needRefund")}
                         </span>
                         <span className={`text-3xl font-black leading-none mt-1.5 ${view === "refunds" ? "text-rose-600" : ""}`}>{bookings.length}</span>
                     </div>
                     <Button 
                         variant="outline" 
                         size="icon" 
-                        className="rounded-full h-12 w-12 border-slate-100"
+                        className="rounded-full h-12 w-12 border-border cursor-pointer active:scale-95"
                         onClick={() => queryClient.invalidateQueries({ queryKey: ["admin-bookings"] })}
                     >
-                        <Activity className="w-5 h-5 text-slate-400" />
+                        <Activity className="w-5 h-5 text-muted-foreground" />
                     </Button>
                 </div>
             </div>
@@ -380,7 +382,7 @@ export default function AdminBookingsPage() {
                     <div className="flex-1 w-full relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Tìm theo khách hàng hoặc tên sân..."
+                            placeholder={t("bookings.searchPlaceholder")}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="pl-10 h-12 rounded-xl bg-muted/30 border-transparent focus:border-primary focus:bg-background font-bold text-sm"
@@ -392,19 +394,19 @@ export default function AdminBookingsPage() {
                             onChange={(e) => setStatus(e.target.value)}
                             className="h-12 px-4 bg-muted/30 border border-transparent rounded-xl outline-none focus:border-primary font-bold text-xs cursor-pointer text-foreground"
                         >
-                            <option value="" className="text-muted-foreground">Trạng thái</option>
-                            <option value="PENDING">Chờ xử lý</option>
-                            <option value="CONFIRMED">Thành công (Sắp diễn ra)</option>
-                            <option value="COMPLETED">Đã hoàn thành</option>
-                            <option value="CANCELLED">Đã hủy</option>
+                            <option value="" className="bg-card text-muted-foreground">{t("bookings.status")}</option>
+                            <option value="PENDING">{t("bookings.statusPending")}</option>
+                            <option value="CONFIRMED">{t("bookings.statusConfirmed")}</option>
+                            <option value="COMPLETED">{t("bookings.statusCompleted")}</option>
+                            <option value="CANCELLED">{t("bookings.statusCancelled")}</option>
                         </select>
                         <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-transparent focus-within:border-primary">
-                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent pl-3 pr-1 h-10 outline-none font-bold text-[11px] cursor-pointer" />
+                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent pl-3 pr-1 h-10 outline-none font-bold text-[11px] cursor-pointer text-foreground" />
                             <ArrowRight className="h-3 w-3 text-muted-foreground/50" />
-                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent pl-1 pr-3 h-10 outline-none font-bold text-[11px] cursor-pointer" />
+                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent pl-1 pr-3 h-10 outline-none font-bold text-[11px] cursor-pointer text-foreground" />
                         </div>
                         {(search || status || startDate || endDate) && (
-                            <Button variant="ghost" onClick={() => { setSearch(""); setStatus(""); setStartDate(""); setEndDate(""); }} className="text-destructive font-black text-[10px] uppercase tracking-widest hover:bg-destructive/10">Đặt lại</Button>
+                            <Button variant="ghost" onClick={() => { setSearch(""); setStatus(""); setStartDate(""); setEndDate(""); }} className="text-destructive font-black text-[10px] uppercase tracking-widest hover:bg-destructive/10">{t("bookings.reset")}</Button>
                         )}
                     </div>
                 </div>
@@ -426,27 +428,25 @@ export default function AdminBookingsPage() {
                     </div>
                 </div>
             ) : (
-                <div className="bg-white rounded-[2rem] border overflow-hidden shadow-sm">
-                    <DataTable columns={columns} data={bookings} />
-                </div>
+                <DataTable columns={columns} data={bookings} />
             )}
 
             {/* Refund Dialog */}
             <AlertDialog open={!!bookingToRefund} onOpenChange={() => setBookingToRefund(null)}>
-                <AlertDialogContent className="rounded-[2.5rem] max-w-lg">
+                <AlertDialogContent className="rounded-[2.5rem] max-w-lg bg-card text-card-foreground">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-2xl font-black uppercase italic flex items-center gap-2">
-                            <Wallet className="w-6 h-6 text-rose-600" /> Hoàn tiền thủ công
+                            <Wallet className="w-6 h-6 text-rose-600" /> {t("bookings.manualRefund")}
                         </AlertDialogTitle>
-                        <AlertDialogDescription className="font-medium text-slate-600">
-                            Quét mã VietQR bên dưới để chuyển khoản hoàn tiền cho khách hàng.
+                        <AlertDialogDescription className="font-medium text-muted-foreground">
+                            {t("bookings.manualRefundDesc")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
 
                     {bookingToRefund && (
                         <div className="space-y-6 py-4">
                             {/* VietQR Display */}
-                            <div className="flex flex-col items-center gap-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                            <div className="flex flex-col items-center gap-4 bg-muted/30 p-6 rounded-[2rem] border border-border">
                                 {bookingToRefund.user?.bankAccountNumber ? (
                                     <div className="relative w-64 h-64 bg-white p-2 rounded-2xl shadow-sm overflow-hidden">
                                         <Image 
@@ -459,29 +459,29 @@ export default function AdminBookingsPage() {
                                 ) : (
                                     <div className="w-64 h-64 flex flex-col items-center justify-center text-center gap-2 text-rose-500 font-bold px-4">
                                         <XCircle className="w-12 h-12" />
-                                        Khách hàng chưa cập nhật thông tin ngân hàng!
+                                        {t("bookings.noBankInfo")}
                                     </div>
                                 )}
                                 
                                 <div className="text-center space-y-1">
-                                    <div className="text-xs font-black uppercase text-slate-400 tracking-widest">Số tiền hoàn</div>
-                                    <div className="text-3xl font-black text-slate-900">{bookingToRefund.totalPrice.toLocaleString()}đ</div>
+                                    <div className="text-xs font-black uppercase text-muted-foreground tracking-widest">{t("bookings.refundAmount")}</div>
+                                    <div className="text-3xl font-black text-foreground">{bookingToRefund.totalPrice.toLocaleString()}đ</div>
                                 </div>
                             </div>
 
                             {/* Bank Details Text */}
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 bg-slate-50 rounded-2xl">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ngân hàng</div>
-                                    <div className="font-bold text-slate-900">{bookingToRefund.user?.bankName || "N/A"}</div>
+                                <div className="p-4 bg-muted/30 rounded-2xl border border-border">
+                                    <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">{t("bookings.bank")}</div>
+                                    <div className="font-bold text-foreground">{bookingToRefund.user?.bankName || "N/A"}</div>
                                 </div>
-                                <div className="p-4 bg-slate-50 rounded-2xl">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Chủ tài khoản</div>
-                                    <div className="font-bold text-slate-900">{bookingToRefund.user?.bankAccountName || "N/A"}</div>
+                                <div className="p-4 bg-muted/30 rounded-2xl border border-border">
+                                    <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">{t("bookings.bankAccountName")}</div>
+                                    <div className="font-bold text-foreground">{bookingToRefund.user?.bankAccountName || "N/A"}</div>
                                 </div>
-                                <div className="p-4 bg-slate-50 rounded-2xl col-span-2">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Số tài khoản</div>
-                                    <div className="font-bold text-xl text-slate-900 tracking-wider">{bookingToRefund.user?.bankAccountNumber || "N/A"}</div>
+                                <div className="p-4 bg-muted/30 rounded-2xl border border-border col-span-2">
+                                    <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">{t("bookings.bankAccountNumber")}</div>
+                                    <div className="font-bold text-xl text-foreground tracking-wider">{bookingToRefund.user?.bankAccountNumber || "N/A"}</div>
                                 </div>
                             </div>
                         </div>
@@ -494,12 +494,12 @@ export default function AdminBookingsPage() {
                                 e.preventDefault();
                                 if (bookingToRefund) refundMutation.mutate(bookingToRefund.id);
                             }}
-                            className="w-full rounded-2xl h-14 bg-emerald-600 text-white hover:bg-emerald-700 font-black uppercase tracking-widest shadow-lg shadow-emerald-100"
+                            className="w-full rounded-2xl h-14 bg-emerald-600 text-white hover:bg-emerald-700 font-black uppercase tracking-widest shadow-lg shadow-emerald-600/10 cursor-pointer active:scale-98"
                         >
-                            {refundMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Xác nhận đã chuyển khoản"}
+                            {refundMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : t("bookings.confirmRefunded")}
                         </AlertDialogAction>
-                        <AlertDialogCancel className="w-full rounded-2xl h-14 font-bold border-none hover:bg-slate-100">
-                            Để sau
+                        <AlertDialogCancel className="w-full rounded-2xl h-14 font-bold border-none hover:bg-secondary cursor-pointer">
+                            {t("bookings.postpone")}
                         </AlertDialogCancel>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -507,22 +507,22 @@ export default function AdminBookingsPage() {
 
 
             <AlertDialog open={!!bookingToConfirm} onOpenChange={() => setBookingToConfirm(null)}>
-                <AlertDialogContent className="rounded-[2rem]">
+                <AlertDialogContent className="rounded-[2rem] bg-card text-card-foreground">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-black uppercase">Xác nhận đơn đặt?</AlertDialogTitle>
-                        <AlertDialogDescription className="font-medium">Xác nhận đơn này đã được thanh toán.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-xl font-black uppercase">{t("bookings.confirmTitle")}</AlertDialogTitle>
+                        <AlertDialogDescription className="font-medium text-muted-foreground">{t("bookings.confirmDesc")}</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-3">
-                        <AlertDialogCancel className="rounded-xl h-11 font-bold">Quay lại</AlertDialogCancel>
+                        <AlertDialogCancel className="rounded-xl h-11 font-bold cursor-pointer">{t("bookings.back")}</AlertDialogCancel>
                         <AlertDialogAction 
                             disabled={confirmMutation.isPending}
                             onClick={(e) => {
                                 e.preventDefault();
                                 if (bookingToConfirm) confirmMutation.mutate(bookingToConfirm);
                             }} 
-                            className="rounded-xl h-11 bg-emerald-600 text-white hover:bg-emerald-700 font-bold min-w-[120px]"
+                            className="rounded-xl h-11 bg-emerald-600 text-white hover:bg-emerald-700 font-bold min-w-[120px] cursor-pointer active:scale-98"
                         >
-                            {confirmMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận ngay"}
+                            {confirmMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("bookings.confirmBtn")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

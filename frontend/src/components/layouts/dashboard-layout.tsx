@@ -83,8 +83,6 @@ interface UserProfile {
 export function DashboardLayout({
                                     children,
                                     menuItems: initialMenuItems = adminMenuItems,
-                                    roleLabel: initialRoleLabel = "Chủ sân",
-                                    roleDetail = "Manager"
                                 }: {
     children: React.ReactNode,
     menuItems?: typeof adminMenuItems,
@@ -127,8 +125,8 @@ export function DashboardLayout({
 
     const profileHref = pathname.startsWith("/admin") ? "/admin/profile" : "/user/profile";
     const menuItems = initialMenuItems;
-
-    const roleLabel = userData?.fullName || initialRoleLabel;
+    const roleLabel = userData?.fullName || (pathname.startsWith("/admin") ? t("sidebar.roleAdminLabel") : t("sidebar.roleUserLabel"));
+    const roleDetail = pathname.startsWith("/admin") ? t("sidebar.roleAdminDetail") : t("sidebar.roleUserDetail");
     const userEmail = userData?.email || "...";
 
     const confirmLogout = async () => {
@@ -164,6 +162,9 @@ export function DashboardLayout({
         if (name === "Dashboard") return t("sidebar.dashboard");
         if (name === "Quản lý Sân") return t("sidebar.manageCourts");
         if (name === "Đơn đặt sân") return t("sidebar.bookings");
+        if (name === "Tìm sân") return t("sidebar.searchCourts");
+        if (name === "Lịch sử đặt") return t("sidebar.bookingHistory");
+        if (name === "Hồ sơ cá nhân") return t("sidebar.personalProfile");
         return name;
     };
 
@@ -239,7 +240,7 @@ export function DashboardLayout({
             </Sidebar>
             <SidebarInset className="bg-muted/30">
                 <header
-                    className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/80 backdrop-blur-md px-6 transition-all duration-300">
+                    className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/80 backdrop-blur-md px-6 transition-all duration-300">
                     <div className="flex items-center gap-2">
                         <SidebarTrigger className="-ml-1 active:scale-95 transition-transform"/>
                         <Separator orientation="vertical" className="mr-2 h-4"/>

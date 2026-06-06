@@ -17,6 +17,7 @@ import {authService} from "@/services/auth.service";
 import {toast} from "sonner";
 import {useRouter} from "next/navigation";
 import {handleComingSoon} from "@/lib/coming-soon";
+import {useLanguage} from "@/context/language-context";
 import {
     Card,
     CardContent,
@@ -39,6 +40,7 @@ interface UserData {
 
 export function ProfileView() {
     const router = useRouter();
+    const {t} = useLanguage();
     const [userData, setUserData] = useState<UserData | null>(null);
     const [isDataLoading, setIsDataLoading] = useState(true);
 
@@ -57,37 +59,37 @@ export function ProfileView() {
                 setUserData(data);
             } catch (error) {
                 console.error("Profile fetch error:", error);
-                toast.error("Không thể tải thông tin hồ sơ");
+                toast.error(t("profile.fetchError"));
             } finally {
                 setIsDataLoading(false);
             }
         };
         fetchProfile();
-    }, []);
+    }, [t]);
 
     const handlePasswordChange = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (newPassword.length < 6) {
-            toast.error("Mật khẩu mới phải có ít nhất 6 ký tự");
+            toast.error(t("profile.passwordMinLength"));
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            toast.error("Mật khẩu xác nhận không khớp");
+            toast.error(t("profile.passwordMismatch"));
             return;
         }
 
         try {
             setIsSubmitting(true);
             await authService.changePassword({oldPassword, newPassword});
-            toast.success("Đổi mật khẩu thành công!");
+            toast.success(t("profile.passwordSuccess"));
             setOldPassword("");
             setNewPassword("");
             setConfirmPassword("");
         } catch (error: unknown) {
             const err = error as { response?: { data?: { message?: string | string[] } } };
-            const message = err.response?.data?.message || "Đổi mật khẩu thất bại";
+            const message = err.response?.data?.message || t("profile.passwordError");
             toast.error(Array.isArray(message) ? message[0] : message);
         } finally {
             setIsSubmitting(false);
@@ -130,11 +132,11 @@ export function ProfileView() {
                     <div className="space-y-3">
                         <div
                             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-widest">
-                            Tài khoản chính thức
+                            {t("profile.officialAccount")}
                         </div>
                         <h1 className="text-4xl md:text-5xl font-black tracking-tight">{userData?.fullName}</h1>
                         <div
-                            className="flex flex-wrap justify-center md:justify-start gap-4 text-slate-400 font-medium">
+                            className="flex flex-wrap justify-center md:justify-start gap-4 text-slate-300 font-medium">
                             <div className="flex items-center gap-2">
                                 <Mail className="w-4 h-4"/> {userData?.email}
                             </div>
@@ -150,87 +152,87 @@ export function ProfileView() {
                 {/* Left Column: Personal Info */}
                 <div className="lg:col-span-3 space-y-6">
                     <Card
-                        className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden bg-white/80 backdrop-blur-xl">
+                        className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl overflow-hidden bg-card/85 text-card-foreground border border-border/60 backdrop-blur-xl">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-                                <div className="p-2 rounded-xl bg-cyan-50 text-cyan-600">
+                            <CardTitle className="text-2xl font-bold flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500">
                                     <User className="w-6 h-6"/>
                                 </div>
-                                Thông tin cá nhân
+                                {t("profile.personalInfo")}
                             </CardTitle>
-                            <CardDescription className="ml-11">Các thông tin cơ bản liên kết với tài khoản của
-                                bạn</CardDescription>
+                            <CardDescription className="ml-11">
+                                {t("profile.personalInfoDesc")}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 ml-1">Họ và tên</label>
+                                    <label className="text-sm font-bold text-foreground/90 ml-1">{t("profile.fullName")}</label>
                                     <Input
                                         value={userData?.fullName || ""}
                                         readOnly
-                                        className="h-12 bg-slate-50/50 border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/20"
+                                        className="h-12 bg-muted/30 border-border rounded-xl focus-visible:ring-2 focus-visible:ring-primary/20"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 ml-1">Vai trò</label>
+                                    <label className="text-sm font-bold text-foreground/90 ml-1">{t("profile.role")}</label>
                                     <Input
-                                        value={userData?.role === 'ADMIN' ? "Quản trị viên" : "Khách hàng"}
+                                        value={userData?.role === 'ADMIN' ? t("profile.roleAdmin") : t("profile.roleUser")}
                                         readOnly
-                                        className="h-12 bg-slate-50/50 border-slate-200 rounded-xl capitalize"
+                                        className="h-12 bg-muted/30 border-border rounded-xl capitalize"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-400 ml-1">Email</label>
+                                    <label className="text-sm font-bold text-muted-foreground ml-1">{t("profile.email")}</label>
                                     <Input
                                         value={userData?.email || ""}
                                         disabled
-                                        className="h-12 bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed rounded-xl"
+                                        className="h-12 bg-muted/50 border-border text-muted-foreground cursor-not-allowed rounded-xl"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-400 ml-1">Số điện thoại</label>
+                                    <label className="text-sm font-bold text-muted-foreground ml-1">{t("profile.phone")}</label>
                                     <Input
                                         value={userData?.phone || ""}
                                         disabled
-                                        className="h-12 bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed rounded-xl"
+                                        className="h-12 bg-muted/50 border-border text-muted-foreground cursor-not-allowed rounded-xl"
                                     />
                                 </div>
                             </div>
 
-                            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3">
-                                <Activity className="w-5 h-5 text-amber-600 mt-0.5"/>
-                                <p className="text-xs text-amber-800 leading-relaxed">
-                                    <strong>Lưu ý:</strong> Để đảm bảo tính xác thực và an toàn, bạn không thể tự thay
-                                    đổi Email và Số điện thoại. Vui lòng liên hệ hỗ trợ nếu cần cập nhật.
+                            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-2xl border border-amber-100 dark:border-amber-900/30 flex items-start gap-3">
+                                <Activity className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5"/>
+                                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                                    <strong>{t("profile.note")}</strong> {t("profile.noteDesc")}
                                 </p>
                             </div>
                         </CardContent>
                     </Card>
 
                     {/* Bank Info Section */}
-                    <Card className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden bg-white/80 backdrop-blur-xl">
+                    <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl overflow-hidden bg-card/85 text-card-foreground border border-border/60 backdrop-blur-xl">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-                                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                            <CardTitle className="text-2xl font-bold flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
                                     <Activity className="w-6 h-6" />
                                 </div>
-                                Thông tin hoàn tiền
+                                {t("profile.refundInfo")}
                             </CardTitle>
-                            <CardDescription className="ml-11">Quản lý tài khoản ngân hàng để nhận lại tiền khi hủy lịch</CardDescription>
+                            <CardDescription className="ml-11">{t("profile.refundInfoDesc")}</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6">
-                            <div className="p-6 rounded-[2rem] bg-slate-900 text-white relative overflow-hidden group">
+                            <div className="p-6 rounded-[2rem] bg-slate-950 text-white relative overflow-hidden group border border-white/5">
                                 <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl group-hover:bg-emerald-500/30 transition-all duration-500"></div>
                                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
                                     <div className="space-y-1">
-                                        <h3 className="font-bold text-lg">Cập nhật tài khoản ngân hàng</h3>
-                                        <p className="text-slate-400 text-sm">Hệ thống sẽ tự động hoàn tiền vào tài khoản này.</p>
+                                        <h3 className="font-bold text-lg">{t("profile.updateBank")}</h3>
+                                        <p className="text-slate-400 text-sm">{t("profile.updateBankDesc")}</p>
                                     </div>
                                     <Button 
                                         onClick={() => router.push("/user/profile/bank")}
-                                        className="h-12 px-8 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                                        className="h-12 px-8 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
                                     >
-                                        Cập nhật ngay
+                                        {t("profile.updateNow")}
                                     </Button>
                                 </div>
                             </div>
@@ -241,33 +243,32 @@ export function ProfileView() {
                 {/* Right Column: Change Password */}
                 <div className="lg:col-span-2">
                     <Card
-                        className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden sticky top-8">
-                        <CardHeader className="bg-slate-900 text-white pb-6 relative overflow-hidden">
+                        className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none rounded-3xl overflow-hidden sticky top-8 bg-card text-card-foreground">
+                        <CardHeader className="bg-slate-950 text-white pb-6 relative overflow-hidden border-b border-white/5">
                             <CardTitle className="text-xl font-bold flex items-center gap-2 relative z-10">
-                                <KeyRound className="w-5 h-5 text-cyan-400"/> Đổi mật khẩu
+                                <KeyRound className="w-5 h-5 text-cyan-400"/> {t("profile.changePassword")}
                             </CardTitle>
-                            <CardDescription className="text-slate-400 relative z-10">Cập nhật mật khẩu để bảo vệ tài
-                                khoản</CardDescription>
+                            <CardDescription className="text-slate-400 relative z-10">{t("profile.changePasswordDesc")}</CardDescription>
                             <div
                                 className="absolute top-0 right-0 w-32 h-32 bg-cyan-500 rounded-full blur-[60px] opacity-20 -mr-16 -mt-16"></div>
                         </CardHeader>
                         <form onSubmit={handlePasswordChange}>
                             <CardContent className="pt-8 space-y-5">
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-bold text-slate-700">Mật khẩu hiện tại</label>
+                                    <label className="text-sm font-bold text-foreground/90">{t("profile.currentPassword")}</label>
                                     <div className="relative">
                                         <Input
                                             type={showOldPassword ? "text" : "password"}
                                             required
                                             value={oldPassword}
                                             onChange={(e) => setOldPassword(e.target.value)}
-                                            placeholder="Nhập mật khẩu cũ"
-                                            className="h-11 bg-slate-50/50 border-slate-200 rounded-xl pr-10"
+                                            placeholder={t("profile.oldPasswordPlaceholder")}
+                                            className="h-11 bg-muted/30 border-border text-foreground rounded-xl pr-10 focus-visible:ring-2 focus-visible:ring-primary/20"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowOldPassword(!showOldPassword)}
-                                            className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 transition-colors"
+                                            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                         >
                                             {showOldPassword ? <EyeOff className="h-4 w-4"/> :
                                                 <Eye className="h-4 w-4"/>}
@@ -275,11 +276,11 @@ export function ProfileView() {
                                     </div>
                                 </div>
 
-                                <Separator className="bg-slate-100"/>
+                                <Separator className="bg-border/60"/>
 
                                 <div className="space-y-4 pt-1">
                                     <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-slate-700">Mật khẩu mới</label>
+                                        <label className="text-sm font-bold text-foreground/90">{t("profile.newPassword")}</label>
                                         <div className="relative">
                                             <Input
                                                 type={showNewPassword ? "text" : "password"}
@@ -287,13 +288,13 @@ export function ProfileView() {
                                                 minLength={6}
                                                 value={newPassword}
                                                 onChange={(e) => setNewPassword(e.target.value)}
-                                                placeholder="Tối thiểu 6 ký tự"
-                                                className="h-11 bg-slate-50/50 border-slate-200 rounded-xl pr-10"
+                                                placeholder={t("profile.newPasswordPlaceholder")}
+                                                className="h-11 bg-muted/30 border-border text-foreground rounded-xl pr-10 focus-visible:ring-2 focus-visible:ring-primary/20"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setShowNewPassword(!showNewPassword)}
-                                                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 transition-colors"
+                                                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                             >
                                                 {showNewPassword ? <EyeOff className="h-4 w-4"/> :
                                                     <Eye className="h-4 w-4"/>}
@@ -301,14 +302,14 @@ export function ProfileView() {
                                         </div>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-slate-700">Xác nhận mật khẩu</label>
+                                        <label className="text-sm font-bold text-foreground/90">{t("profile.confirmPassword")}</label>
                                         <Input
                                             type={showNewPassword ? "text" : "password"}
                                             required
                                             value={confirmPassword}
                                             onChange={(e) => setConfirmPassword(e.target.value)}
-                                            placeholder="Nhập lại mật khẩu mới"
-                                            className="h-11 bg-slate-50/50 border-slate-200 rounded-xl"
+                                            placeholder={t("profile.confirmPasswordPlaceholder")}
+                                            className="h-11 bg-muted/30 border-border text-foreground rounded-xl focus-visible:ring-2 focus-visible:ring-primary/20"
                                         />
                                     </div>
                                 </div>
@@ -317,17 +318,17 @@ export function ProfileView() {
                                 <Button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center gap-2"
+                                    className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/95 font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                                 >
                                     {isSubmitting ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin"/>
-                                            Đang xử lý...
+                                            {t("profile.processing")}
                                         </>
                                     ) : (
                                         <>
                                             <Save className="w-4 h-4"/>
-                                            Cập nhật mật khẩu
+                                            {t("profile.updatePasswordBtn")}
                                         </>
                                     )}
                                 </Button>
@@ -339,10 +340,10 @@ export function ProfileView() {
 
             <div 
                 onClick={() => handleComingSoon()}
-                className="flex items-center justify-center gap-2 text-slate-400 text-xs py-4 cursor-help opacity-70 hover:opacity-100 transition-opacity"
+                className="flex items-center justify-center gap-2 text-muted-foreground text-xs py-4 cursor-help opacity-70 hover:opacity-100 transition-opacity"
             >
                 <Activity className="w-3 h-3"/>
-                <span>Trạng thái hệ thống: Ổn định (Chi tiết)</span>
+                <span>{t("profile.systemStatus")}</span>
             </div>
         </div>
     );

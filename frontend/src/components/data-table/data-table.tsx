@@ -103,26 +103,38 @@ export function DataTable<TData, TValue>({
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="ml-auto flex h-10 gap-2 px-3.5 rounded-xl border-border bg-secondary hover:bg-secondary/80 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                                className="ml-auto flex h-10 gap-2 px-4 rounded-xl border border-border bg-card text-foreground hover:bg-primary/10 hover:text-primary active:scale-95 transition-all duration-200 shadow-sm text-xs font-bold cursor-pointer"
                             >
                                 <SlidersHorizontal className="h-3.5 w-3.5"/>
-                                <span className="hidden sm:inline">{locale === "vi" ? "Hiển thị" : "Columns"}</span>
+                                <span className="hidden sm:inline">{t("common.columns")}</span>
                             </Button>
                         } 
                     />
-                    <DropdownMenuContent align="end" className="w-[150px] rounded-xl p-1">
+                    <DropdownMenuContent align="end" className="w-[160px] rounded-xl p-1 bg-card text-card-foreground border border-border shadow-md">
                         {table
                             .getAllColumns()
                             .filter((column) => column.getCanHide())
                             .map((column) => {
+                                // Translate column IDs
+                                const columnLabel = 
+                                    column.id === "id" ? t("bookings.code") :
+                                    column.id === "customer" ? t("bookings.customer") :
+                                    column.id === "court" ? t("bookings.court") :
+                                    column.id === "schedule" ? t("bookings.schedule") :
+                                    column.id === "totalPrice" ? t("bookings.payment") :
+                                    column.id === "status" ? t("bookings.status") :
+                                    column.id === "reason" ? t("bookings.reason") :
+                                    column.id === "actions" ? t("bookings.actions") :
+                                    column.id;
+
                                 return (
                                     <DropdownMenuCheckboxItem
                                         key={column.id}
-                                        className="capitalize rounded-lg px-2 py-1.5 text-xs font-bold cursor-pointer"
+                                        className="capitalize rounded-lg px-2.5 py-1.5 text-xs font-bold cursor-pointer hover:bg-muted/80 focus:bg-muted/80"
                                         checked={column.getIsVisible()}
                                         onCheckedChange={(value) => column.toggleVisibility(!!value)}
                                     >
-                                        {column.id}
+                                        {columnLabel}
                                     </DropdownMenuCheckboxItem>
                                 )
                             })}
@@ -202,11 +214,11 @@ export function DataTable<TData, TValue>({
                         size="sm"
                         onClick={() => table.previousPage()}
                         disabled={!table.getCanPreviousPage()}
-                        className="h-8 w-8 p-0 rounded-lg active:scale-95 transition-all cursor-pointer"
+                        className="h-9 w-9 p-0 rounded-xl border border-border bg-card text-foreground hover:bg-primary/10 hover:text-primary active:scale-95 transition-all duration-200 shadow-sm cursor-pointer disabled:opacity-40 disabled:hover:bg-card disabled:hover:text-foreground/40 disabled:cursor-not-allowed"
                     >
-                        <ChevronLeft className="h-4 w-4"/>
+                        <ChevronLeft className="h-4.5 w-4.5"/>
                     </Button>
-                    <span className="text-[10px] font-black text-muted-foreground px-2 uppercase tracking-wide">
+                    <span className="text-xs font-bold text-foreground px-3 tracking-tight">
                         {locale === "vi" ? (
                             <>Trang {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}</>
                         ) : (
@@ -218,9 +230,9 @@ export function DataTable<TData, TValue>({
                         size="sm"
                         onClick={() => table.nextPage()}
                         disabled={!table.getCanNextPage()}
-                        className="h-8 w-8 p-0 rounded-lg active:scale-95 transition-all cursor-pointer"
+                        className="h-9 w-9 p-0 rounded-xl border border-border bg-card text-foreground hover:bg-primary/10 hover:text-primary active:scale-95 transition-all duration-200 shadow-sm cursor-pointer disabled:opacity-40 disabled:hover:bg-card disabled:hover:text-foreground/40 disabled:cursor-not-allowed"
                     >
-                        <ChevronRight className="h-4 w-4"/>
+                        <ChevronRight className="h-4.5 w-4.5"/>
                     </Button>
                 </div>
             </div>
