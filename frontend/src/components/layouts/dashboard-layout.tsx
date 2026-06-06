@@ -14,10 +14,15 @@ import {
     Settings,
     Bell,
     Search,
+    Sun,
+    Moon,
+    Languages,
 } from "lucide-react";
 import Cookies from "js-cookie";
 import {authService} from "@/services/auth.service";
 import {handleComingSoon} from "@/lib/coming-soon";
+import {useLanguage} from "@/context/language-context";
+import {useTheme} from "next-themes";
 
 import {
     Sidebar,
@@ -90,13 +95,16 @@ export function DashboardLayout({
     const [isLogoutOpen, setIsLogoutOpen] = React.useState(false);
     const pathname = usePathname();
     const router = useRouter();
+    const {locale, setLocale, t} = useLanguage();
+    const {theme, setTheme} = useTheme();
+    const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
+        setMounted(true);
         // 1. Load from sessionStorage immediately (UX: No flicker)
         const savedUser = sessionStorage.getItem("user");
         if (savedUser) {
             try {
-                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setUserData(JSON.parse(savedUser));
             } catch (e) {
                 console.error("Failed to parse saved user", e);
@@ -111,7 +119,6 @@ export function DashboardLayout({
                 sessionStorage.setItem("user", JSON.stringify(profile));
             } catch (error) {
                 console.error("Failed to fetch profile in layout:", error);
-                // If 401, apiClient will handle the redirect
             }
         };
         fetchUser();
@@ -125,13 +132,10 @@ export function DashboardLayout({
 
     const confirmLogout = async () => {
         setIsLogoutOpen(false);
-        // Navigate immediately for better UX
         router.push("/login");
-        // Clear local data
         sessionStorage.clear();
         Cookies.remove("access_token");
         Cookies.remove("refresh_token");
-        // Notify backend in background
         try {
             await authService.logout();
         } catch (e) {
@@ -151,9 +155,16 @@ export function DashboardLayout({
             window.removeEventListener("updateBreadcrumb", handleUpdate);
             setTitleOverride(null);
         };
-    }, [pathname]); // Reset when path changes
+    }, [pathname]);
 
     const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+    const getTranslatedName = (name: string) => {
+        if (name === "Dashboard") return t("sidebar.dashboard");
+        if (name === "Quản lý Sân") return t("sidebar.manageCourts");
+        if (name === "Đơn đặt sân") return t("sidebar.bookings");
+        return name;
+    };
 
     const breadcrumbs = pathname
         .split("/")
@@ -162,19 +173,18 @@ export function DashboardLayout({
             const href = "/" + array.slice(0, index + 1).join("/");
             let label = segment.charAt(0).toUpperCase() + segment.slice(1);
             
-            // If segment is a UUID (like court ID), show override title or "Chi tiết"
             if (isUUID(segment)) {
-                label = titleOverride || "Chi tiết";
+                label = titleOverride || t("common.loading");
             } else if (label === "User") {
-                label = "Người dùng";
+                label = t("sidebar.userTitle");
             } else if (label === "Admin") {
-                label = "Tổng quan";
+                label = t("sidebar.dashboard");
             } else if (label === "Courts") {
-                label = "Sân bóng";
+                label = t("sidebar.manageCourts");
             } else if (label === "Bookings") {
-                label = "Đơn đặt sân";
+                label = t("sidebar.bookings");
             } else if (label === "Profile") {
-                label = "Hồ sơ";
+                label = t("common.profile");
             }
 
             return {label, href, isLast: index === array.length - 1};
@@ -185,12 +195,12 @@ export function DashboardLayout({
             <Sidebar collapsible="icon">
                 <SidebarHeader className="h-16 flex items-center px-6">
                     <Link href={pathname.startsWith("/admin") ? "/admin" : "/user"} className="flex items-center gap-3">
-                        <div className="bg-primary p-1.5 rounded-lg">
+                        <div className="bg-primary p-1.5 rounded-lg active:scale-95 transition-transform">
                             <Activity className="w-5 h-5 text-primary-foreground"/>
                         </div>
-                        <span className="text-xl font-bold tracking-tight group-data-[collapsible=icon]:hidden">
-              NOVA<span className="text-muted-foreground">{pathname.startsWith("/admin") ? "Admin" : "Booking"}</span>
-            </span>
+                        <span className="text-xl font-black tracking-tight group-data-[collapsible=icon]:hidden text-foreground">
+                            NOVA<span className="text-muted-foreground font-medium">{pathname.startsWith("/admin") ? "Admin" : "Booking"}</span>
+                        </span>
                     </Link>
                 </SidebarHeader>
                 <SidebarContent>
@@ -201,42 +211,42 @@ export function DashboardLayout({
                                 <SidebarMenuItem key={item.href}>
                                     <SidebarMenuButton
                                         isActive={isActive}
-                                        tooltip={item.name}
-                                        className="h-11"
+                                        tooltip={getTranslatedName(item.name)}
+                                        className="h-11 rounded-xl active:scale-98 transition-all"
                                         render={<Link href={item.href}/>}
                                     >
                                         <item.icon className={isActive ? "text-primary" : "text-muted-foreground"}/>
-                                        <span className="font-medium">{item.name}</span>
+                                        <span className="font-bold">{getTranslatedName(item.name)}</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             );
                         })}
                     </SidebarMenu>
                 </SidebarContent>
-                <SidebarFooter className="p-4 border-t">
+                <SidebarFooter className="p-4 border-t border-border">
                     <SidebarMenu>
                         <SidebarMenuItem>
                             <SidebarMenuButton onClick={() => setIsLogoutOpen(true)}
-                                               className="h-11 text-muted-foreground hover:text-destructive">
-                                <LogOut/>
-                                <span>Đăng xuất</span>
+                                               className="h-11 rounded-xl text-muted-foreground hover:text-destructive active:scale-98 transition-all">
+                                <LogOut className="w-4 h-4"/>
+                                <span className="font-bold">{t("common.logout")}</span>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarFooter>
                 <SidebarRail/>
             </Sidebar>
-            <SidebarInset className="bg-muted/40">
+            <SidebarInset className="bg-muted/30">
                 <header
-                    className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+                    className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/80 backdrop-blur-md px-6 transition-all duration-300">
                     <div className="flex items-center gap-2">
-                        <SidebarTrigger className="-ml-1"/>
+                        <SidebarTrigger className="-ml-1 active:scale-95 transition-transform"/>
                         <Separator orientation="vertical" className="mr-2 h-4"/>
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href={pathname.startsWith("/admin") ? "/admin" : "/user"}>
-                                        {pathname.startsWith("/admin") ? "Quản trị" : "Người dùng"}
+                                    <BreadcrumbLink href={pathname.startsWith("/admin") ? "/admin" : "/user"} className="font-medium">
+                                        {pathname.startsWith("/admin") ? t("sidebar.adminTitle") : t("sidebar.userTitle")}
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 {breadcrumbs.map((crumb) => (
@@ -244,9 +254,9 @@ export function DashboardLayout({
                                         <BreadcrumbSeparator className="hidden md:block"/>
                                         <BreadcrumbItem>
                                             {crumb.isLast ? (
-                                                <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                                                <BreadcrumbPage className="font-bold text-foreground">{crumb.label}</BreadcrumbPage>
                                             ) : (
-                                                <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
+                                                <BreadcrumbLink href={crumb.href} className="font-medium">{crumb.label}</BreadcrumbLink>
                                             )}
                                         </BreadcrumbItem>
                                     </React.Fragment>
@@ -256,15 +266,37 @@ export function DashboardLayout({
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="relative hidden md:block opacity-60 cursor-not-allowed">
+                        <div className="relative hidden md:block opacity-40 cursor-not-allowed">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/>
                             <Input
                                 type="search"
-                                placeholder="Tìm kiếm... (Sắp ra mắt)"
+                                placeholder={`${t("common.search")} (${t("common.notAvailable")})`}
                                 disabled
-                                className="w-64 pl-9 rounded-full bg-muted/50 border-none cursor-not-allowed"
+                                className="w-64 pl-9 rounded-full bg-muted/50 border-none cursor-not-allowed text-xs"
                             />
                         </div>
+
+                        {/* Language Toggle */}
+                        <button
+                            onClick={() => setLocale(locale === "vi" ? "en" : "vi")}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase bg-secondary/80 hover:bg-primary/10 hover:text-primary rounded-full transition-all border border-border cursor-pointer active:scale-95"
+                        >
+                            <Languages className="w-3.5 h-3.5"/>
+                            {locale}
+                        </button>
+
+                        {/* Theme Toggle */}
+                        <button
+                            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all border border-transparent cursor-pointer active:scale-95"
+                            aria-label="Toggle theme"
+                        >
+                            {mounted && theme === "dark" ? (
+                                <Sun className="w-5 h-5 text-amber-500 fill-amber-500/25"/>
+                            ) : (
+                                <Moon className="w-5 h-5 text-indigo-500 fill-indigo-500/25"/>
+                            )}
+                        </button>
 
                         <button 
                             onClick={() => handleComingSoon()}
@@ -277,21 +309,21 @@ export function DashboardLayout({
 
                         <DropdownMenu>
                             <DropdownMenuTrigger render={<button
-                                className="flex items-center gap-2 hover:bg-muted p-1 pr-2 rounded-full transition-colors"/>}>
+                                className="flex items-center gap-2 hover:bg-secondary p-1 pr-2 rounded-full transition-all cursor-pointer active:scale-98"/>}>
                                 <div
                                     className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
                                     <UserCircle className="w-6 h-6"/>
                                 </div>
                                 <div className="text-left hidden lg:block">
-                                    <p className="text-sm font-bold leading-none">{roleLabel}</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase mt-1">{roleDetail}</p>
+                                    <p className="text-xs font-bold leading-none text-foreground">{roleLabel}</p>
+                                    <p className="text-[9px] text-muted-foreground uppercase mt-0.5 font-bold tracking-wider">{roleDetail}</p>
                                 </div>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-56" align="end">
+                            <DropdownMenuContent className="w-56 rounded-2xl p-1.5" align="end">
                                 <DropdownMenuGroup>
-                                    <DropdownMenuLabel className="font-normal">
+                                    <DropdownMenuLabel className="font-normal px-2 py-1.5">
                                         <div className="flex flex-col space-y-1">
-                                            <p className="text-sm font-medium leading-none">{roleLabel}</p>
+                                            <p className="text-sm font-bold leading-none text-foreground">{roleLabel}</p>
                                             <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
                                         </div>
                                     </DropdownMenuLabel>
@@ -299,24 +331,24 @@ export function DashboardLayout({
                                 <DropdownMenuSeparator/>
                                 <DropdownMenuGroup>
                                     <DropdownMenuItem render={
-                                        <Link href={profileHref} className="flex w-full items-center"/>
+                                        <Link href={profileHref} className="flex w-full items-center px-2 py-1.5 rounded-xl font-medium"/>
                                     }>
                                         <User className="mr-2 h-4 w-4"/>
-                                        <span>Hồ sơ</span>
+                                        <span>{t("common.profile")}</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem 
                                         onClick={() => handleComingSoon()}
-                                        className="opacity-60 cursor-not-allowed"
+                                        className="opacity-60 cursor-not-allowed px-2 py-1.5 rounded-xl font-medium"
                                     >
                                         <Settings className="mr-2 h-4 w-4"/>
-                                        <span>Cài đặt</span>
+                                        <span>{t("common.settings")}</span>
                                     </DropdownMenuItem>
                                 </DropdownMenuGroup>
                                 <DropdownMenuSeparator/>
                                 <DropdownMenuItem onClick={() => setIsLogoutOpen(true)}
-                                                  className="text-destructive focus:text-destructive">
+                                                  className="text-destructive focus:text-destructive px-2 py-1.5 rounded-xl font-medium cursor-pointer">
                                     <LogOut className="mr-2 h-4 w-4"/>
-                                    <span>Đăng xuất</span>
+                                    <span>{t("common.logout")}</span>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -326,20 +358,20 @@ export function DashboardLayout({
             </SidebarInset>
 
             <AlertDialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
-                <AlertDialogContent>
+                <AlertDialogContent className="rounded-[2rem] max-w-sm">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Xác nhận đăng xuất</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không?
+                        <AlertDialogTitle className="text-xl font-black uppercase tracking-tight text-foreground">{t("common.confirmLogout")}</AlertDialogTitle>
+                        <AlertDialogDescription className="font-medium text-muted-foreground">
+                            {t("common.logoutPrompt")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Hủy</AlertDialogCancel>
+                    <AlertDialogFooter className="gap-2 sm:flex-col mt-2">
+                        <AlertDialogCancel className="w-full rounded-xl h-11 border-none hover:bg-secondary font-bold text-xs">{t("common.cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={confirmLogout}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="w-full rounded-xl h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold text-xs"
                         >
-                            Đăng xuất
+                            {t("common.logout")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -347,3 +379,4 @@ export function DashboardLayout({
         </SidebarProvider>
     );
 }
+

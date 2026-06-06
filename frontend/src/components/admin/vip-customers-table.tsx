@@ -28,20 +28,36 @@ interface VipCustomersTableProps {
     customers: VipCustomer[];
 }
 
+import { useLanguage } from "@/context/language-context";
+
+interface VipCustomer {
+    userId: string;
+    name: string;
+    phone: string;
+    totalBookings: number;
+    totalSpent: number;
+}
+
+interface VipCustomersTableProps {
+    customers: VipCustomer[];
+}
+
 const VipCustomersTable: React.FC<VipCustomersTableProps> = ({ customers }) => {
+    const { t } = useLanguage();
+
     return (
-        <Card className="border-none shadow-sm flex flex-col h-full overflow-hidden">
+        <Card className="border-none shadow-sm flex flex-col h-full overflow-hidden bg-card">
             <CardHeader className="border-b border-muted/20 bg-muted/5">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-50 rounded-xl">
-                        <User className="h-5 w-5 text-indigo-500" />
+                    <div className="p-2 bg-primary/10 rounded-xl">
+                        <User className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                        <CardTitle className="text-lg font-black uppercase tracking-tight">
-                            Top khách hàng VIP
+                        <CardTitle className="text-lg font-black uppercase tracking-tight text-foreground">
+                            {t("adminDashboard.vipCustomers")}
                         </CardTitle>
-                        <CardDescription className="text-[10px] font-black uppercase tracking-widest">
-                            Dựa trên tổng mức chi tiêu tích lũy
+                        <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            {t("adminDashboard.vipCustomersSub")}
                         </CardDescription>
                     </div>
                 </div>
@@ -51,13 +67,13 @@ const VipCustomersTable: React.FC<VipCustomersTableProps> = ({ customers }) => {
                     <TableHeader>
                         <TableRow className="bg-muted/30 hover:bg-muted/30 border-none">
                             <TableHead className="px-6 h-12 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                Khách hàng
+                                {t("adminDashboard.tableCustomer")}
                             </TableHead>
                             <TableHead className="text-center h-12 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                Số lượt
+                                {t("adminDashboard.tableBookings")}
                             </TableHead>
                             <TableHead className="text-right px-6 h-12 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                Chi tiêu
+                                {t("adminDashboard.tableSpent")}
                             </TableHead>
                         </TableRow>
                     </TableHeader>
@@ -68,7 +84,7 @@ const VipCustomersTable: React.FC<VipCustomersTableProps> = ({ customers }) => {
                                     <TableCell className="px-6 py-4">
                                         <div className="flex items-center gap-3">
                                             <div
-                                                className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                                                className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
                                                 {index + 1}
                                             </div>
                                             <div className="flex flex-col">
@@ -89,7 +105,7 @@ const VipCustomersTable: React.FC<VipCustomersTableProps> = ({ customers }) => {
                                         </span>
                                     </TableCell>
                                     <TableCell className="text-right px-6">
-                                        <span className="text-sm font-black tracking-tighter">
+                                        <span className="text-sm font-black tracking-tighter text-foreground">
                                             {new Intl.NumberFormat("vi-VN", {
                                                 style: "currency",
                                                 currency: "VND",
@@ -103,10 +119,10 @@ const VipCustomersTable: React.FC<VipCustomersTableProps> = ({ customers }) => {
                                 <TableCell colSpan={3} className="h-60 text-center">
                                     <div className="flex flex-col items-center gap-3 opacity-20">
                                         <div className="p-4 bg-muted rounded-full">
-                                            <User className="h-10 w-10" />
+                                            <User className="h-10 w-10 text-muted-foreground" />
                                         </div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest">
-                                            Chưa có dữ liệu khách hàng VIP
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                            {t("adminDashboard.noVipData")}
                                         </p>
                                     </div>
                                 </TableCell>

@@ -21,6 +21,8 @@ import {TooltipProvider} from "@/components/ui/tooltip";
 import {Toaster} from "@/components/ui/sonner";
 import QueryProvider from "@/components/providers/query-provider";
 import {SocketProvider} from "@/components/providers/socket-provider";
+import {ThemeProvider} from "@/components/providers/theme-provider";
+import {LanguageProvider} from "@/context/language-context";
 
 export default function RootLayout({
                                        children,
@@ -31,17 +33,23 @@ export default function RootLayout({
         <html
             lang="en"
             className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+            suppressHydrationWarning
         >
         <body className="min-h-full flex flex-col font-sans">
-        <QueryProvider>
-            <SocketProvider>
-                <TooltipProvider>
-                    {children}
-                    <Toaster position="top-center" richColors/>
-                </TooltipProvider>
-            </SocketProvider>
-        </QueryProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <LanguageProvider>
+                <QueryProvider>
+                    <SocketProvider>
+                        <TooltipProvider>
+                            {children}
+                            <Toaster position="top-center" richColors/>
+                        </TooltipProvider>
+                    </SocketProvider>
+                </QueryProvider>
+            </LanguageProvider>
+        </ThemeProvider>
         </body>
         </html>
     );
 }
+

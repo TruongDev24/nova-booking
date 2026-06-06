@@ -3,35 +3,39 @@ import { MapPin, Star, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Court } from "@/services/court.service";
+import { useLanguage } from "@/context/language-context";
 
 interface CourtCardProps {
     court: Court;
 }
 
 export function CourtCard({ court }: CourtCardProps) {
+    const { t } = useLanguage();
+
     return (
-        <div className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group">
+        <div className="bg-card rounded-3xl overflow-hidden border border-border shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 transition-all duration-300 group">
             {/* Image Cover */}
-            <div className="relative h-64 overflow-hidden">
+            <div className="relative h-60 overflow-hidden bg-muted">
                 {court.images?.[0] ? (
                     <Image
                         src={court.images[0]}
                         alt={court.name}
                         fill
-                        className="object-cover group-hover:scale-110 transition-transform duration-700"
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                 ) : (
-                    <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
                         <ImageIcon className="w-12 h-12" />
                     </div>
                 )}
-                <div className="absolute top-5 left-5 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
-                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                    <span className="text-sm font-black text-slate-900">
-                        {court.avgRating ? court.avgRating.toFixed(1) : "Chưa có"}
+                <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-md px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm border border-border z-10">
+                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    <span className="text-xs font-black text-foreground">
+                        {court.avgRating ? court.avgRating.toFixed(1) : "N/A"}
                     </span>
                     {(court.reviewCount ?? court.totalReviews ?? 0) > 0 && (
-                        <span className="text-[10px] text-slate-400 font-bold ml-1">
+                        <span className="text-[10px] text-muted-foreground font-bold ml-0.5">
                             ({court.reviewCount ?? court.totalReviews})
                         </span>
                     )}
@@ -39,32 +43,35 @@ export function CourtCard({ court }: CourtCardProps) {
             </div>
 
             {/* Content */}
-            <div className="p-8 space-y-6">
-                <div>
-                    <h3 className="text-2xl font-black text-slate-900 mb-2 group-hover:text-cyan-600 transition-colors">
+            <div className="p-6 space-y-6">
+                <div className="space-y-2">
+                    <h3 className="text-xl font-black text-foreground group-hover:text-primary transition-colors line-clamp-1">
                         {court.name}
                     </h3>
-                    <div className="flex items-center gap-2 text-slate-500 font-medium">
-                        <MapPin className="w-4 h-4 text-cyan-500" />
-                        <span className="text-sm line-clamp-1">{court.location}</span>
+                    <div className="flex items-center gap-1.5 text-muted-foreground font-semibold">
+                        <MapPin className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                        <span className="text-xs line-clamp-1">{court.location}</span>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                <div className="flex items-center justify-between pt-5 border-t border-border">
                     <div className="flex flex-col">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Giá mỗi giờ</span>
-                        <span className="text-2xl font-black text-slate-900">
+                        <span className="text-[9px] uppercase font-black text-muted-foreground tracking-widest leading-none">
+                            {t("adminDashboard.tableRevenue")} /h
+                        </span>
+                        <span className="text-xl font-black text-foreground mt-1">
                             {court.pricePerHour.toLocaleString()}đ
                         </span>
                     </div>
                     <Link
                         href={`/user/courts/${court.id}`}
-                        className="bg-slate-900 text-white px-6 py-3.5 rounded-2xl text-sm font-black hover:bg-cyan-600 transition-all shadow-xl shadow-slate-900/10 active:scale-95"
+                        className="bg-primary text-primary-foreground px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-primary/90 transition-all shadow-md shadow-primary/10 active:scale-95 text-center"
                     >
-                        Đặt sân ngay
+                        {t("userDashboard.bookNow")}
                     </Link>
                 </div>
             </div>
         </div>
     );
 }
+

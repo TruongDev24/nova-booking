@@ -44,6 +44,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSocket } from "@/hooks/use-socket";
 
+import { useLanguage } from "@/context/language-context";
+
 // --- Helpers ---
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -57,6 +59,7 @@ const formatPercent = (value: number) => {
 };
 
 export default function AdminDashboard() {
+    const { t } = useLanguage();
     const getInitialDates = () => {
         const now = new Date();
         const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -142,9 +145,9 @@ export default function AdminDashboard() {
             <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
                 <XCircle className="w-12 h-12 text-destructive opacity-20" />
                 <p className="text-muted-foreground font-black uppercase tracking-widest text-xs">
-                    Lỗi khi tải dữ liệu phân tích.
+                    {t("adminDashboard.loadError")}
                 </p>
-                <Button variant="outline" onClick={() => window.location.reload()}> Thử lại </Button>
+                <Button variant="outline" onClick={() => window.location.reload()}> {t("adminDashboard.retry")} </Button>
             </div>
         );
     }
@@ -163,60 +166,60 @@ export default function AdminDashboard() {
 
     const stats = [
         {
-            label: "Tổng doanh thu",
+            label: t("adminDashboard.totalRevenue"),
             value: formatCurrency(overview?.totalRevenue || 0),
-            description: "Trong khoảng thời gian đã chọn",
+            description: t("adminDashboard.totalRevenueDesc"),
             icon: DollarSign,
-            color: "text-blue-500",
-            bg: "bg-blue-50/50 dark:bg-blue-950/20",
+            color: "text-primary",
+            bg: "bg-primary/10",
         },
         {
-            label: "Tỷ lệ lấp đầy",
+            label: t("adminDashboard.occupancyRate"),
             value: formatPercent(overview?.occupancyRate || 0),
-            description: "Hiệu suất sử dụng sân",
+            description: t("adminDashboard.occupancyRateDesc"),
             icon: Percent,
-            color: "text-emerald-500",
-            bg: "bg-emerald-50/50 dark:bg-emerald-950/20",
+            color: "text-teal-500",
+            bg: "bg-teal-500/10",
         },
         {
-            label: "Số đơn đặt sân",
-            value: `${overview?.totalBookings || 0} đơn`,
-            description: "Số giao dịch thành công",
+            label: t("adminDashboard.bookingsCount"),
+            value: t("adminDashboard.unitBookingsShort", { count: overview?.totalBookings || 0 }),
+            description: t("adminDashboard.bookingsCountDesc"),
             icon: ShoppingBag,
-            color: "text-indigo-500",
-            bg: "bg-indigo-50/50 dark:bg-indigo-950/20",
+            color: "text-emerald-500",
+            bg: "bg-emerald-500/10",
         },
         {
-            label: "Tổng giờ chơi",
-            value: `${overview?.totalBookedHours || 0}h`,
-            description: "Tổng thời gian sân hoạt động",
+            label: t("adminDashboard.totalHours"),
+            value: t("adminDashboard.unitHours", { count: overview?.totalBookedHours || 0 }),
+            description: t("adminDashboard.totalHoursDesc"),
             icon: Clock,
             color: "text-amber-500",
-            bg: "bg-amber-50/50 dark:bg-amber-950/20",
+            bg: "bg-amber-500/10",
         },
         {
-            label: "Trung bình đơn (AOV)",
+            label: t("adminDashboard.aov"),
             value: formatCurrency(overview?.aov || 0),
-            description: "Doanh thu trung bình / đơn",
+            description: t("adminDashboard.aovDesc"),
             icon: TrendingUp,
-            color: "text-purple-500",
-            bg: "bg-purple-50/50 dark:bg-purple-950/20",
+            color: "text-primary",
+            bg: "bg-primary/10",
         },
         {
-            label: "Tỷ lệ hủy đặt",
+            label: t("adminDashboard.cancelRate"),
             value: formatPercent(overview?.cancelRate || 0),
-            description: "Tỷ lệ hủy đơn đã thanh toán",
+            description: t("adminDashboard.cancelRateDesc"),
             icon: XCircle,
-            color: "text-rose-500",
-            bg: "bg-rose-50/50 dark:bg-rose-950/20",
+            color: "text-destructive",
+            bg: "bg-destructive/10",
         },
     ];
 
     const tabs = [
-        { id: "overview", label: "Tổng quan", icon: BarChart3 },
-        { id: "courts", label: "Sân & Hiệu suất", icon: TrendingUp },
-        { id: "customers", label: "Khách hàng & Đánh giá", icon: Users },
-        { id: "operations", label: "Vận hành & Lịch trình", icon: Clock },
+        { id: "overview", label: t("adminDashboard.tabs.overview"), icon: BarChart3 },
+        { id: "courts", label: t("adminDashboard.tabs.courts"), icon: TrendingUp },
+        { id: "customers", label: t("adminDashboard.tabs.customers"), icon: Users },
+        { id: "operations", label: t("adminDashboard.tabs.operations"), icon: Clock },
     ];
 
     // Helper to render stars for feedback
@@ -241,11 +244,11 @@ export default function AdminDashboard() {
     const getPaymentMethodLabel = (method: string) => {
         switch (method) {
             case "CASH":
-                return "Tiền mặt";
+                return t("adminDashboard.payment.cash");
             case "BANK_TRANSFER":
-                return "Chuyển khoản";
+                return t("adminDashboard.payment.bankTransfer");
             case "E_WALLET":
-                return "Ví điện tử";
+                return t("adminDashboard.payment.eWallet");
             default:
                 return method;
         }
@@ -258,10 +261,10 @@ export default function AdminDashboard() {
                 <div>
                     <h1 className="text-3xl font-black tracking-tight uppercase italic flex items-center gap-3 text-foreground">
                         <BarChart3 className="w-8 h-8 text-primary" />
-                        Thống kê kinh doanh
+                        {t("adminDashboard.title")}
                     </h1>
                     <p className="text-muted-foreground font-medium text-sm">
-                        Quản lý doanh thu, hiệu suất sân và phân tích hành vi khách hàng.
+                        {t("adminDashboard.sub")}
                     </p>
                 </div>
 
@@ -272,27 +275,27 @@ export default function AdminDashboard() {
                             variant={isPresetActive(7) ? "default" : "ghost"}
                             size="sm"
                             onClick={() => handlePreset(7)}
-                            className={`text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                                isPresetActive(7) ? "shadow-sm shadow-primary/10" : ""
+                            className={`text-[9px] font-black uppercase tracking-widest rounded-lg transition-all active:scale-95 duration-100 ${
+                                isPresetActive(7) ? "shadow-sm shadow-primary/10 bg-primary text-primary-foreground" : "hover:bg-muted"
                             }`}
                         >
-                            7 ngày
+                            {t("adminDashboard.preset7Days")}
                         </Button>
                         <Button
                             variant={isPresetActive(30) ? "default" : "ghost"}
                             size="sm"
                             onClick={() => handlePreset(30)}
-                            className={`text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                                isPresetActive(30) ? "shadow-sm shadow-primary/10" : ""
+                            className={`text-[9px] font-black uppercase tracking-widest rounded-lg transition-all active:scale-95 duration-100 ${
+                                isPresetActive(30) ? "shadow-sm shadow-primary/10 bg-primary text-primary-foreground" : "hover:bg-muted"
                             }`}
                         >
-                            30 ngày
+                            {t("adminDashboard.preset30Days")}
                         </Button>
                     </div>
 
                     {/* Date Inputs */}
                     <div className="flex items-center gap-2 text-xs font-black text-muted-foreground w-full sm:w-auto justify-between sm:justify-start">
-                        <span className="uppercase tracking-wider text-[8px]">Từ</span>
+                        <span className="uppercase tracking-wider text-[8px]">{t("adminDashboard.filterFrom")}</span>
                         <input
                             type="date"
                             value={startDate}
@@ -300,7 +303,7 @@ export default function AdminDashboard() {
                             max={endDate || undefined}
                             className="bg-background text-foreground border border-muted/35 px-2 py-1 rounded-lg text-xs font-bold focus:outline-none focus:border-primary transition-colors"
                         />
-                        <span className="uppercase tracking-wider text-[8px]">Đến</span>
+                        <span className="uppercase tracking-wider text-[8px]">{t("adminDashboard.filterTo")}</span>
                         <input
                             type="date"
                             value={endDate}
@@ -321,7 +324,7 @@ export default function AdminDashboard() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 active:scale-[0.98] ${
                                 isActive
                                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10 scale-[1.02]"
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -371,15 +374,15 @@ export default function AdminDashboard() {
                             <Card className="lg:col-span-2 border-none shadow-sm overflow-hidden bg-card">
                                 <CardHeader className="border-b border-muted/10 bg-muted/5">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded-xl">
-                                            <TrendingUp className="h-5 w-5 text-blue-500" />
+                                        <div className="p-2 bg-primary/10 rounded-xl">
+                                            <TrendingUp className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
                                             <CardTitle className="text-base font-black uppercase tracking-tight text-foreground">
-                                                Biểu đồ doanh thu
+                                                {t("adminDashboard.revenueChart")}
                                             </CardTitle>
                                             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                Biến động dòng tiền thực nhận trong chu kỳ
+                                                {t("adminDashboard.revenueChartSub")}
                                             </CardDescription>
                                         </div>
                                     </div>
@@ -390,8 +393,8 @@ export default function AdminDashboard() {
                                             <AreaChart data={revenueChart}>
                                                 <defs>
                                                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.0} />
                                                     </linearGradient>
                                                 </defs>
                                                 <CartesianGrid
@@ -433,13 +436,13 @@ export default function AdminDashboard() {
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any) => [
                                                         formatCurrency(Number(value || 0)),
-                                                        "Doanh thu",
+                                                        t("adminDashboard.tableRevenue"),
                                                     ]}
                                                 />
                                                 <Area
                                                     type="monotone"
                                                     dataKey="revenue"
-                                                    stroke="#3b82f6"
+                                                    stroke="var(--primary)"
                                                     strokeWidth={3}
                                                     fillOpacity={1}
                                                     fill="url(#colorRev)"
@@ -455,15 +458,15 @@ export default function AdminDashboard() {
                             <Card className="border-none shadow-sm overflow-hidden bg-card flex flex-col justify-between">
                                 <CardHeader className="border-b border-muted/10 bg-muted/5">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-indigo-50 dark:bg-indigo-950/20 rounded-xl">
-                                            <CreditCard className="h-5 w-5 text-indigo-500" />
+                                        <div className="p-2 bg-primary/10 rounded-xl">
+                                            <CreditCard className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
                                             <CardTitle className="text-base font-black uppercase tracking-tight text-foreground">
-                                                Cơ cấu thanh toán
+                                                {t("adminDashboard.paymentMethods")}
                                             </CardTitle>
                                             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                Tỷ lệ phương thức sử dụng
+                                                {t("adminDashboard.paymentMethodsSub")}
                                             </CardDescription>
                                         </div>
                                     </div>
@@ -475,9 +478,9 @@ export default function AdminDashboard() {
                                             return paymentMethods.map((pm, idx) => {
                                                 const pct = totalCount > 0 ? (pm.count / totalCount) * 100 : 0;
                                                 const colors = [
-                                                    { progress: "bg-blue-500", text: "text-blue-500", dot: "bg-blue-500" },
+                                                    { progress: "bg-primary", text: "text-primary", dot: "bg-primary" },
+                                                    { progress: "bg-teal-500", text: "text-teal-500", dot: "bg-teal-500" },
                                                     { progress: "bg-emerald-500", text: "text-emerald-500", dot: "bg-emerald-500" },
-                                                    { progress: "bg-purple-500", text: "text-purple-500", dot: "bg-purple-500" },
                                                 ];
                                                 const c = colors[idx % colors.length];
 
@@ -489,7 +492,7 @@ export default function AdminDashboard() {
                                                                 <span className="text-foreground">{getPaymentMethodLabel(pm.method)}</span>
                                                             </div>
                                                             <div className="text-right">
-                                                                <span className="text-foreground">{pm.count} đơn</span>
+                                                                <span className="text-foreground">{t("adminDashboard.unitBookingsShort", { count: pm.count })}</span>
                                                                 <span className="text-muted-foreground ml-2">({pct.toFixed(0)}%)</span>
                                                             </div>
                                                         </div>
@@ -500,7 +503,7 @@ export default function AdminDashboard() {
                                                             />
                                                         </div>
                                                         <p className="text-[10px] font-bold text-muted-foreground">
-                                                            Doanh số: {formatCurrency(pm.amount)}
+                                                            {t("adminDashboard.sales")}: {formatCurrency(pm.amount)}
                                                         </p>
                                                     </div>
                                                 );
@@ -509,7 +512,7 @@ export default function AdminDashboard() {
                                     ) : (
                                         <div className="text-center py-8 opacity-40">
                                             <CreditCard className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                                            <p className="text-[10px] font-black uppercase tracking-widest">Không có dữ liệu giao dịch</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t("adminDashboard.noTransactions")}</p>
                                         </div>
                                     )}
                                 </CardContent>
@@ -526,15 +529,15 @@ export default function AdminDashboard() {
                             <Card className="border-none shadow-sm overflow-hidden bg-card">
                                 <CardHeader className="border-b border-muted/10 bg-muted/5">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-emerald-50 dark:bg-emerald-950/20 rounded-xl">
-                                            <BarChart3 className="h-5 w-5 text-emerald-500" />
+                                        <div className="p-2 bg-primary/10 rounded-xl">
+                                            <BarChart3 className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
                                             <CardTitle className="text-base font-black uppercase tracking-tight text-foreground">
-                                                Doanh thu từng sân
+                                                {t("adminDashboard.courtPerformance")}
                                             </CardTitle>
                                             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                So sánh doanh thu thực tế trong kỳ
+                                                {t("adminDashboard.courtPerformanceSub")}
                                             </CardDescription>
                                         </div>
                                     </div>
@@ -574,7 +577,7 @@ export default function AdminDashboard() {
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any) => [
                                                         formatCurrency(Number(value || 0)),
-                                                        "Doanh thu",
+                                                        t("adminDashboard.tableRevenue"),
                                                     ]}
                                                     labelStyle={{
                                                         fontWeight: 900,
@@ -587,7 +590,8 @@ export default function AdminDashboard() {
                                                     {courtPerformance?.map((_: unknown, index: number) => (
                                                         <Cell
                                                             key={`cell-${index}`}
-                                                            fill={index % 2 === 0 ? "#10b981" : "#34d399"}
+                                                            fill="var(--primary)"
+                                                            fillOpacity={index % 2 === 0 ? 1 : 0.6}
                                                         />
                                                     ))}
                                                 </Bar>
@@ -601,15 +605,15 @@ export default function AdminDashboard() {
                             <Card className="border-none shadow-sm overflow-hidden bg-card">
                                 <CardHeader className="border-b border-muted/10 bg-muted/5">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-indigo-50 dark:bg-indigo-950/20 rounded-xl">
-                                            <Percent className="h-5 w-5 text-indigo-500" />
+                                        <div className="p-2 bg-primary/10 rounded-xl">
+                                            <Percent className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
                                             <CardTitle className="text-base font-black uppercase tracking-tight text-foreground">
-                                                Tỷ lệ lấp đầy sân
+                                                {t("adminDashboard.occupancyChart")}
                                             </CardTitle>
                                             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                Hiệu suất đặt sân riêng lẻ (%)
+                                                {t("adminDashboard.occupancyChartSub")}
                                             </CardDescription>
                                         </div>
                                     </div>
@@ -649,7 +653,7 @@ export default function AdminDashboard() {
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any) => [
                                                         `${Number(value || 0).toFixed(1)}%`,
-                                                        "Tỷ lệ lấp đầy",
+                                                        t("adminDashboard.occupancyRate"),
                                                     ]}
                                                     labelStyle={{
                                                         fontWeight: 900,
@@ -662,7 +666,8 @@ export default function AdminDashboard() {
                                                     {courtPerformance?.map((_: unknown, index: number) => (
                                                         <Cell
                                                             key={`cell-${index}`}
-                                                            fill={index % 2 === 0 ? "#6366f1" : "#818cf8"}
+                                                            fill="var(--chart-2)"
+                                                            fillOpacity={index % 2 === 0 ? 1 : 0.6}
                                                         />
                                                     ))}
                                                 </Bar>
@@ -677,10 +682,10 @@ export default function AdminDashboard() {
                         <Card className="border-none shadow-sm overflow-hidden bg-card">
                             <CardHeader className="border-b border-muted/10 bg-muted/5">
                                 <CardTitle className="text-base font-black uppercase tracking-tight text-foreground">
-                                    Thống kê chi tiết theo sân
+                                    {t("adminDashboard.courtDetails")}
                                 </CardTitle>
                                 <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                    Bảng phân tích hiệu quả kinh doanh của từng sân cầu lông
+                                    {t("adminDashboard.courtDetailsSub")}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="p-0">
@@ -688,12 +693,12 @@ export default function AdminDashboard() {
                                     <table className="w-full text-left border-collapse">
                                         <thead>
                                             <tr className="bg-muted/30 border-b border-muted/10">
-                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground">Tên sân</th>
-                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">Số lượt đặt</th>
-                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">Số giờ chơi</th>
-                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">Tỷ lệ lấp đầy</th>
-                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">Đánh giá trung bình</th>
-                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-right">Doanh thu</th>
+                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground">{t("adminDashboard.tableName")}</th>
+                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">{t("adminDashboard.tableBookings")}</th>
+                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">{t("adminDashboard.tableHours")}</th>
+                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">{t("adminDashboard.tableOccupancy")}</th>
+                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">{t("adminDashboard.tableRating")}</th>
+                                                <th className="py-3 px-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-right">{t("adminDashboard.tableRevenue")}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -701,10 +706,10 @@ export default function AdminDashboard() {
                                                 courtPerformance.map((court) => (
                                                     <tr key={court.courtName} className="border-b border-muted/10 hover:bg-muted/5 transition-colors">
                                                         <td className="py-4 px-6 text-xs font-black uppercase tracking-tight text-foreground">{court.courtName}</td>
-                                                        <td className="py-4 px-6 text-xs font-black text-center text-foreground">{court.bookings} lượt</td>
-                                                        <td className="py-4 px-6 text-xs font-bold text-center text-muted-foreground">{court.bookedHours}h</td>
+                                                        <td className="py-4 px-6 text-xs font-black text-center text-foreground">{t("adminDashboard.unitBookings", { count: court.bookings })}</td>
+                                                        <td className="py-4 px-6 text-xs font-bold text-center text-muted-foreground">{t("adminDashboard.unitHours", { count: court.bookedHours })}</td>
                                                         <td className="py-4 px-6 text-center">
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-primary/10 text-primary">
                                                                 {court.occupancyRate}%
                                                             </span>
                                                         </td>
@@ -720,7 +725,7 @@ export default function AdminDashboard() {
                                             ) : (
                                                 <tr>
                                                     <td colSpan={6} className="py-8 text-center text-xs font-bold text-muted-foreground opacity-60">
-                                                        Không có dữ liệu sân.
+                                                        {t("adminDashboard.noCourtData")}
                                                     </td>
                                                 </tr>
                                             )}
@@ -745,21 +750,21 @@ export default function AdminDashboard() {
                             <CardHeader className="border-b border-muted/10 bg-muted/5">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-amber-50 dark:bg-amber-950/20 rounded-xl">
-                                            <MessageSquare className="h-5 w-5 text-amber-500" />
+                                        <div className="p-2 bg-primary/10 rounded-xl">
+                                            <MessageSquare className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
                                             <CardTitle className="text-base font-black uppercase tracking-tight text-foreground">
-                                                Đánh giá & Phản hồi
+                                                {t("adminDashboard.recentFeedback")}
                                             </CardTitle>
                                             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                Ý kiến từ người chơi trong kỳ
+                                                {t("adminDashboard.recentFeedbackSub")}
                                             </CardDescription>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400">
+                                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary/10 text-primary">
                                         <UserCheck className="w-3.5 h-3.5" />
-                                        <span className="text-[10px] font-black uppercase tracking-wider">{overview?.activeCustomers || 0} Khách đặt</span>
+                                        <span className="text-[10px] font-black uppercase tracking-wider">{t("adminDashboard.activeCustomersCount", { count: overview?.activeCustomers || 0 })}</span>
                                     </div>
                                 </div>
                             </CardHeader>
@@ -772,7 +777,7 @@ export default function AdminDashboard() {
                                                     <div>
                                                         <h4 className="text-xs font-black uppercase text-foreground">{rev.userName}</h4>
                                                         <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider">
-                                                            Đã đặt: <span className="text-primary font-bold">{rev.courtName}</span>
+                                                            {t("adminDashboard.bookedCourt")} <span className="text-primary font-bold">{rev.courtName}</span>
                                                         </p>
                                                     </div>
                                                     <div className="text-right space-y-1">
@@ -791,7 +796,7 @@ export default function AdminDashboard() {
                                 ) : (
                                     <div className="flex flex-col items-center justify-center h-80 opacity-40">
                                         <MessageSquare className="w-10 h-10 mb-2 text-muted-foreground" />
-                                        <p className="text-[10px] font-black uppercase tracking-widest">Chưa nhận được đánh giá nào</p>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t("adminDashboard.noReviewsData")}</p>
                                     </div>
                                 )}
                             </CardContent>
@@ -812,15 +817,15 @@ export default function AdminDashboard() {
                             <Card className="border-none shadow-sm overflow-hidden bg-card flex flex-col h-full">
                                 <CardHeader className="border-b border-muted/10 bg-muted/5">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-indigo-50 dark:bg-indigo-950/20 rounded-xl">
-                                            <Calendar className="h-5 w-5 text-indigo-500" />
+                                        <div className="p-2 bg-primary/10 rounded-xl">
+                                            <Calendar className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
                                             <CardTitle className="text-base font-black uppercase tracking-tight text-foreground">
-                                                Mật độ theo thứ
+                                                {t("adminDashboard.dayDensity")}
                                             </CardTitle>
                                             <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                Lượng đơn đặt phân phối trong tuần
+                                                {t("adminDashboard.dayDensitySub")}
                                             </CardDescription>
                                         </div>
                                     </div>
@@ -857,7 +862,7 @@ export default function AdminDashboard() {
                                                         padding: "0.75rem",
                                                     }}
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                    formatter={(value: any) => [`${value ?? 0} lượt đặt`, "Số lượng"]}
+                                                    formatter={(value: any) => [t("adminDashboard.unitBookings", { count: value ?? 0 }), t("adminDashboard.quantity")]}
                                                     labelStyle={{
                                                         fontWeight: 900,
                                                         color: "var(--muted-foreground)",
@@ -871,7 +876,7 @@ export default function AdminDashboard() {
                                                             key={`cell-${index}`}
                                                             fill={
                                                                 entry.count === Math.max(...weeklyDensity.map((d) => d.count)) && entry.count > 0
-                                                                    ? "#818cf8" // highlighted peak day
+                                                                    ? "var(--primary)" // highlighted peak day
                                                                     : "var(--muted)"
                                                             }
                                                             fillOpacity={1}
@@ -889,15 +894,15 @@ export default function AdminDashboard() {
                         <Card className="border-none shadow-sm overflow-hidden bg-card">
                             <CardHeader className="border-b border-muted/10 bg-muted/5">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-rose-50 dark:bg-rose-950/20 rounded-xl">
-                                        <AlertTriangle className="h-5 w-5 text-rose-500" />
+                                    <div className="p-2 bg-destructive/10 rounded-xl">
+                                        <AlertTriangle className="h-5 w-5 text-destructive" />
                                     </div>
                                     <div>
                                         <CardTitle className="text-base font-black uppercase tracking-tight text-foreground">
-                                            Phân tích lý do hủy sân
+                                            {t("adminDashboard.cancelReasonsTitle")}
                                         </CardTitle>
                                         <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                            Danh sách các lý do hủy đặt sân phổ biến trong kỳ
+                                            {t("adminDashboard.cancelReasonsSub")}
                                         </CardDescription>
                                     </div>
                                 </div>
@@ -911,17 +916,17 @@ export default function AdminDashboard() {
                                                 const pct = (cr.count / maxCancel) * 100;
                                                 return (
                                                     <div key={idx} className="flex items-center gap-4">
-                                                        <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/20 flex items-center justify-center font-black text-rose-600 text-xs shrink-0">
+                                                        <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center font-black text-destructive text-xs shrink-0">
                                                             {idx + 1}
                                                         </div>
                                                         <div className="flex-1 space-y-1">
                                                             <div className="flex items-center justify-between text-xs font-bold text-foreground">
                                                                 <span className="truncate max-w-[240px] md:max-w-xs">{cr.reason}</span>
-                                                                <span className="text-rose-500 shrink-0">{cr.count} lần hủy</span>
+                                                                <span className="text-destructive shrink-0">{t("adminDashboard.cancelCount", { count: cr.count })}</span>
                                                             </div>
                                                             <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                                                                 <div
-                                                                    className="h-full bg-rose-500 rounded-full transition-all duration-1000"
+                                                                    className="h-full bg-destructive rounded-full transition-all duration-1000"
                                                                     style={{ width: `${pct}%` }}
                                                                 />
                                                             </div>
@@ -934,7 +939,7 @@ export default function AdminDashboard() {
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-10 opacity-30">
                                         <AlertTriangle className="w-8 h-8 mb-2 text-muted-foreground" />
-                                        <p className="text-[10px] font-black uppercase tracking-widest">Không ghi nhận lý do hủy đặt nào trong kỳ</p>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t("adminDashboard.noCancelData")}</p>
                                     </div>
                                 )}
                             </CardContent>

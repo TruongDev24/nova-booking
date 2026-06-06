@@ -27,13 +27,27 @@ interface PeakHoursChartProps {
     data: PeakHour[];
 }
 
+import { useLanguage } from "@/context/language-context";
+
+interface PeakHour {
+    hour: string;
+    count: number;
+}
+
+interface PeakHoursChartProps {
+    data: PeakHour[];
+}
+
 const PeakHoursChart: React.FC<PeakHoursChartProps> = ({ data }) => {
-    // We don't return null here to avoid layout shifts, handled by main page skeleton
+    const { t } = useLanguage();
+
     if (!data || data.length === 0) {
         return (
-            <Card className="border-none shadow-sm flex flex-col h-full items-center justify-center min-h-[300px] opacity-50">
+            <Card className="border-none shadow-sm flex flex-col h-full items-center justify-center min-h-[300px] opacity-50 bg-card">
                 <Zap className="w-8 h-8 mb-2 text-muted-foreground" />
-                <p className="text-[10px] font-black uppercase tracking-widest">Không có dữ liệu giờ vàng</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    {t("adminDashboard.noPeakHoursData")}
+                </p>
             </Card>
         );
     }
@@ -41,18 +55,18 @@ const PeakHoursChart: React.FC<PeakHoursChartProps> = ({ data }) => {
     const maxCount = Math.max(...data.map((d) => d.count));
 
     return (
-        <Card className="border-none shadow-sm flex flex-col h-full overflow-hidden">
+        <Card className="border-none shadow-sm flex flex-col h-full overflow-hidden bg-card">
             <CardHeader className="border-b border-muted/20 bg-muted/5">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-50 rounded-xl">
-                        <Zap className="h-5 w-5 text-amber-500 fill-current" />
+                    <div className="p-2 bg-primary/10 rounded-xl">
+                        <Zap className="h-5 w-5 text-primary fill-current" />
                     </div>
                     <div>
-                        <CardTitle className="text-lg font-black uppercase tracking-tight">
-                            Khung giờ vàng
+                        <CardTitle className="text-lg font-black uppercase tracking-tight text-foreground">
+                            {t("adminDashboard.peakHours")}
                         </CardTitle>
-                        <CardDescription className="text-[10px] font-black uppercase tracking-widest">
-                            Mật độ đơn đặt theo thời gian (giờ bắt đầu)
+                        <CardDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            {t("adminDashboard.peakHoursSub")}
                         </CardDescription>
                     </div>
                 </div>
@@ -90,7 +104,10 @@ const PeakHoursChart: React.FC<PeakHoursChartProps> = ({ data }) => {
                                     padding: "1rem",
                                 }}
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                formatter={(value: any) => [`${value ?? 0} đơn hàng`, "Số lượng"]}
+                                formatter={(value: any) => [
+                                    t("adminDashboard.unitBookingsShort", { count: value ?? 0 }),
+                                    t("adminDashboard.quantity")
+                                ]}
                                 labelStyle={{
                                     fontWeight: 900,
                                     color: "var(--muted-foreground)",
@@ -105,7 +122,7 @@ const PeakHoursChart: React.FC<PeakHoursChartProps> = ({ data }) => {
                                         key={`cell-${index}`}
                                         fill={
                                             entry.count === maxCount && maxCount > 0
-                                                ? "#f59e0b" // Amber for peak
+                                                ? "var(--primary)" // Primary color for peak
                                                 : "var(--muted)" // Muted for others
                                         }
                                         fillOpacity={entry.count === maxCount ? 1 : 0.5}
