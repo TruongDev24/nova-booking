@@ -45,6 +45,7 @@ export default function LoginPage() {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
         const token = Cookies.get("access_token");
         if (token && token !== "undefined") {

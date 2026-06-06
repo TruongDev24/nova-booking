@@ -98,7 +98,7 @@ export default function ExploreCourtsPage() {
         };
     }, [socket]);
 
-    const {locale, t} = useLanguage();
+    const {t} = useLanguage();
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();

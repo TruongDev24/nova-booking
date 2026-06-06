@@ -29,6 +29,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         // Read preference from cookie first
         const savedLocale = Cookies.get("NEXT_LOCALE") as Locale;
         if (savedLocale === "en" || savedLocale === "vi") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setLocaleState(savedLocale);
         } else {
             // Read from navigator language
@@ -49,10 +50,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         const dictionary = dictionaries[locale];
         const keys = key.split(".");
         
-        let value: any = dictionary;
+        let value: unknown = dictionary;
         for (const k of keys) {
-            if (value && typeof value === "object" && k in value) {
-                value = value[k];
+            if (value && typeof value === "object" && k in (value as Record<string, unknown>)) {
+                value = (value as Record<string, unknown>)[k];
             } else {
                 return key; // Fallback to key if not found
             }
