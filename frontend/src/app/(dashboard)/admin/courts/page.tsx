@@ -17,6 +17,7 @@ import {ColumnDef} from "@tanstack/react-table";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {useSocket} from "@/hooks/use-socket";
 import {AdminReviewsDialog} from "@/components/reviews/AdminReviewsDialog";
+import {useLanguage} from "@/context/language-context";
 
 import {DataTable} from "@/components/data-table/data-table";
 import {Button} from "@/components/ui/button";
@@ -45,29 +46,38 @@ import {
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
-// --- Validation Schema ---
-const courtSchema = z.object({
-    name: z.string()
-        .trim()
-        .min(5, "Tên sân phải có ít nhất 5 ký tự")
-        .max(100, "Tên sân không được quá 100 ký tự"),
-    location: z.string()
-        .trim()
-        .min(10, "Địa chỉ phải cụ thể (ít nhất 10 ký tự)")
-        .max(255, "Địa chỉ quá dài"),
-    pricePerHour: z.number({message: "Giá tiền phải là số"})
-        .min(0, "Giá tiền không được âm")
-        .max(2000000, "Giá tiền quá lớn (tối đa 2.000.000đ)"),
-    description: z.string().optional(),
-    openingTime: z.string().min(1, "Vui lòng chọn giờ mở cửa"),
-    closingTime: z.string().min(1, "Vui lòng chọn giờ đóng cửa"),
-    amenities: z.array(z.string()).optional(),
-});
-
-type CourtFormValues = z.infer<typeof courtSchema>;
+interface CourtFormValues {
+    name: string;
+    location: string;
+    pricePerHour: number;
+    description?: string;
+    openingTime: string;
+    closingTime: string;
+    amenities?: string[];
+}
 
 export default function AdminCourtsPage() {
     const queryClient = useQueryClient();
+    const {t} = useLanguage();
+
+    const courtSchema = React.useMemo(() => z.object({
+        name: z.string()
+            .trim()
+            .min(5, t("courts.valNameMin"))
+            .max(100, t("courts.valNameMax")),
+        location: z.string()
+            .trim()
+            .min(10, t("courts.valLocationMin"))
+            .max(255, t("courts.valLocationMax")),
+        pricePerHour: z.number({message: t("courts.valPriceNumber")})
+            .min(0, t("courts.valPriceMin"))
+            .max(2000000, t("courts.valPriceMax")),
+        description: z.string().optional(),
+        openingTime: z.string().min(1, t("courts.valOpenTime")),
+        closingTime: z.string().min(1, t("courts.valCloseTime")),
+        amenities: z.array(z.string()).optional(),
+    }), [t]);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCourt, setEditingCourt] = useState<Court | null>(null);
     const [courtToDelete, setCourtToDelete] = useState<string | null>(null);
@@ -109,11 +119,11 @@ export default function AdminCourtsPage() {
             console.log("Real-time court update received:", data);
             
             if (data?.name) {
-                toast.info(`Sân "${data.name}" vừa có cập nhật mới!`, {
-                    description: "Dữ liệu đã được đồng bộ.",
+                toast.info(t("courts.toastCourtSync", { name: data.name }), {
+                    description: t("courts.toastCourtSyncDesc"),
                 });
             } else {
-                toast.info("Thông tin sân vừa được cập nhật.");
+                toast.info(t("courts.toastCourtUpdated"));
             }
 
             void queryClient.invalidateQueries({ queryKey: ["courts"] });
@@ -129,7 +139,7 @@ export default function AdminCourtsPage() {
             socket.off("court_updated", handleCourtChange);
             socket.off("court_status_changed", handleCourtChange);
         };
-    }, [socket, queryClient]);
+    }, [socket, queryClient, t]);
 
     // --- React Query: Fetch ---
     const {data: courts = [], isLoading} = useQuery({
@@ -164,10 +174,10 @@ export default function AdminCourtsPage() {
         onSuccess: () => {
             queryClient.invalidateQueries({queryKey: ["courts"]});
             setCourtToDelete(null); // Fix Bug 4: Close modal
-            toast.success("Đã ngừng hoạt động sân thành công"); // Fix Bug 3: Wording
+            toast.success(t("courts.toastDeactivateSuccess")); // Fix Bug 3: Wording
         },
         onError: () => {
-            toast.error("Không thể ngừng hoạt động sân. Vui lòng thử lại."); // Fix Bug 3: Wording
+            toast.error(t("courts.toastDeactivateError")); // Fix Bug 3: Wording
         }
     });
 
@@ -175,17 +185,17 @@ export default function AdminCourtsPage() {
         mutationFn: (id: string) => courtService.reactivate(id),
         onSuccess: () => {
             queryClient.invalidateQueries({queryKey: ["courts"]});
-            toast.success("Đã kích hoạt lại sân thành công");
+            toast.success(t("courts.toastReactivateSuccess"));
         },
         onError: () => {
-            toast.error("Không thể kích hoạt lại sân. Vui lòng thử lại.");
+            toast.error(t("courts.toastReactivateError"));
         }
     });
 
     const columns: ColumnDef<Court>[] = [
         {
             accessorKey: "name",
-            header: "Tên sân",
+            header: t("courts.tableName"),
             cell: ({row}) => {
                 const court = row.original;
                 return (
@@ -209,7 +219,7 @@ export default function AdminCourtsPage() {
         },
         {
             accessorKey: "location",
-            header: "Địa điểm",
+            header: t("courts.tableLocation"),
             cell: ({row}) => (
                 <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium max-w-[200px]">
                     <MapIcon className="h-3 w-3 shrink-0"/>
@@ -219,7 +229,7 @@ export default function AdminCourtsPage() {
         },
         {
             accessorKey: "pricePerHour",
-            header: "Giá thuê",
+            header: t("courts.tablePrice"),
             cell: ({row}) => (
                 <div className="font-black text-primary">
                     {row.original.pricePerHour.toLocaleString()}đ
@@ -228,21 +238,21 @@ export default function AdminCourtsPage() {
         },
         {
             accessorKey: "isDeleted",
-            header: "Trạng thái",
+            header: t("courts.tableStatus"),
             cell: ({row}) => {
                 const isDeleted = row.original.isDeleted;
                 return (
                     <div className={`px-2 py-1 rounded-full text-[10px] font-black uppercase text-center w-fit ${
                         isDeleted ? "bg-destructive/10 text-destructive border border-destructive/20" : "bg-emerald-50 text-emerald-600 border border-emerald-100"
                     }`}>
-                        {isDeleted ? "Ngừng hoạt động" : "Đang hoạt động"}
+                        {isDeleted ? t("courts.statusInactive") : t("courts.statusActive")}
                     </div>
                 );
             },
         },
         {
             accessorKey: "amenities",
-            header: "Tiện ích",
+            header: t("courts.tableAmenities"),
             cell: ({row}) => {
                 const amenities = row.original.amenities as string[] || [];
                 return (
@@ -273,28 +283,28 @@ export default function AdminCourtsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuGroup>
-                                <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => openModal(court)}>
-                                    <Edit className="mr-2 h-4 w-4"/> Sửa thông tin
+                                <DropdownMenuLabel>{t("courts.tableActions")}</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => openModal(court)} className="cursor-pointer">
+                                    <Edit className="mr-2 h-4 w-4"/> {t("courts.actionEdit")}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setActiveReviewsCourt(court)}>
-                                    <Star className="mr-2 h-4 w-4 text-amber-500 fill-amber-500"/> Xem đánh giá
+                                <DropdownMenuItem onClick={() => setActiveReviewsCourt(court)} className="cursor-pointer">
+                                    <Star className="mr-2 h-4 w-4 text-amber-500 fill-amber-500"/> {t("courts.actionReviews")}
                                 </DropdownMenuItem>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator/>
                             {court.isDeleted ? (
                                 <DropdownMenuItem
                                     onClick={() => reactivateMutation.mutate(court.id)}
-                                    className="text-emerald-600 focus:text-emerald-700"
+                                    className="text-emerald-600 focus:text-emerald-700 cursor-pointer"
                                 >
-                                    <Plus className="mr-2 h-4 w-4"/> Kích hoạt lại
+                                    <Plus className="mr-2 h-4 w-4"/> {t("courts.actionReactivate")}
                                 </DropdownMenuItem>
                             ) : (
                                 <DropdownMenuItem
                                     onClick={() => setCourtToDelete(court.id)}
-                                    className="text-destructive focus:text-destructive"
+                                    className="text-destructive focus:text-destructive cursor-pointer"
                                 >
-                                    <Trash2 className="mr-2 h-4 w-4"/> Ngừng hoạt động
+                                    <Trash2 className="mr-2 h-4 w-4"/> {t("courts.actionDeactivate")}
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>
@@ -309,11 +319,11 @@ export default function AdminCourtsPage() {
             const files = Array.from(e.target.files);
             for (const file of files) {
                 if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-                    toast.error(`File ${file.name} không đúng định dạng`);
+                    toast.error(t("courts.toastInvalidFile").replace("{name}", file.name));
                     return;
                 }
                 if (file.size > MAX_FILE_SIZE) {
-                    toast.error(`File ${file.name} vượt quá 5MB`);
+                    toast.error(t("courts.toastFileSize").replace("{name}", file.name));
                     return;
                 }
             }
@@ -359,7 +369,7 @@ export default function AdminCourtsPage() {
 
     const onFormSubmit = async (data: CourtFormValues) => {
         if (!editingCourt && selectedFiles.length === 0) {
-            toast.error("Vui lòng chọn ít nhất 1 ảnh cho sân mới");
+            toast.error(t("courts.toastAddImgError"));
             return;
         }
 
@@ -375,15 +385,15 @@ export default function AdminCourtsPage() {
 
         if (editingCourt) {
             toast.promise(updateMutation.mutateAsync({id: editingCourt.id, formData}), {
-                loading: "Đang cập nhật thông tin sân...",
-                success: "Cập nhật sân thành công!",
-                error: (err) => err?.response?.data?.message || "Lỗi khi cập nhật sân",
+                loading: t("courts.toastUpdateLoading"),
+                success: t("courts.toastUpdateSuccess"),
+                error: (err: unknown) => (err as { response?: { data?: { message?: string } } })?.response?.data?.message || t("courts.toastUpdateError"),
             });
         } else {
             toast.promise(createMutation.mutateAsync(formData), {
-                loading: "Đang tạo sân mới...",
-                success: "Thêm sân mới thành công!",
-                error: (err) => err?.response?.data?.message || "Lỗi khi thêm sân mới",
+                loading: t("courts.toastCreateLoading"),
+                success: t("courts.toastCreateSuccess"),
+                error: (err: unknown) => (err as { response?: { data?: { message?: string } } })?.response?.data?.message || t("courts.toastCreateError"),
             });
         }
     };
@@ -392,15 +402,15 @@ export default function AdminCourtsPage() {
         <div className="space-y-6 animate-in fade-in duration-700">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight uppercase">Quản lý Sân</h1>
-                    <p className="text-muted-foreground font-medium">Hệ thống quản lý cơ sở vật chất và tiện ích.</p>
+                    <h1 className="text-3xl font-black tracking-tight uppercase">{t("courts.title")}</h1>
+                    <p className="text-muted-foreground font-medium">{t("courts.subtitle")}</p>
                 </div>
                 <Button
                     onClick={() => openModal()}
-                    className="flex items-center gap-2 h-11 px-6 rounded-xl font-bold shadow-lg"
+                    className="flex items-center gap-2 h-11 px-6 rounded-xl font-bold shadow-lg cursor-pointer"
                 >
                     <Plus className="w-5 h-5"/>
-                    <span>Thêm sân mới</span>
+                    <span>{t("courts.addBtn")}</span>
                 </Button>
             </div>
 
@@ -425,28 +435,26 @@ export default function AdminCourtsPage() {
                     columns={columns}
                     data={courts}
                     searchKey="name"
-                    searchPlaceholder="Tìm kiếm theo tên sân..."
+                    searchPlaceholder={t("courts.searchPlaceholder")}
                 />
             )}
 
             {/* Confirmation Dialog for Delete */}
             <AlertDialog open={!!courtToDelete} onOpenChange={() => setCourtToDelete(null)}>
-                <AlertDialogContent className="rounded-[2rem]">
+                <AlertDialogContent className="rounded-[2rem] bg-card text-card-foreground">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-black uppercase">Ngừng hoạt động
-                            sân?</AlertDialogTitle>
-                        <AlertDialogDescription className="font-medium">
-                            Bạn có chắc chắn muốn ngừng hoạt động sân này? Hành động này sẽ <strong>tự động hủy tất cả
-                            các lịch đặt sân trong tương lai</strong> và gửi mail thông báo lỗi cho khách hàng.
+                        <AlertDialogTitle className="text-xl font-black uppercase">{t("courts.deactivateTitle")}</AlertDialogTitle>
+                        <AlertDialogDescription className="font-medium text-muted-foreground">
+                            {t("courts.deactivateDesc")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-3">
-                        <AlertDialogCancel className="rounded-xl h-11 font-bold">Hủy bỏ</AlertDialogCancel>
+                        <AlertDialogCancel className="rounded-xl h-11 font-bold cursor-pointer">{t("courts.cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => courtToDelete && deleteMutation.mutate(courtToDelete)}
-                            className="rounded-xl h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold"
+                            className="rounded-xl h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold cursor-pointer active:scale-98"
                         >
-                            Xác nhận
+                            {t("courts.confirm")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -459,7 +467,7 @@ export default function AdminCourtsPage() {
                         className="bg-card border rounded-[2rem] shadow-2xl w-full max-w-2xl my-auto overflow-hidden animate-in fade-in zoom-in duration-300">
                         <div className="flex items-center justify-between p-6 border-b">
                             <h3 className="text-xl font-black uppercase tracking-tight">
-                                {editingCourt ? "Cập nhật sân" : "Thêm sân mới"}
+                                {editingCourt ? t("courts.modalEditTitle") : t("courts.modalAddTitle")}
                             </h3>
                             <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
                                 <X className="w-6 h-6 text-muted-foreground"/>
@@ -470,8 +478,7 @@ export default function AdminCourtsPage() {
                               className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                             <div className="space-y-3">
                                 <label
-                                    className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Hình
-                                    ảnh sân (Tối đa 5 ảnh)</label>
+                                    className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{t("courts.modalImagesLabel")}</label>
                                 <div className="grid grid-cols-5 gap-3">
                                     {previews.map((src, idx) => (
                                         <div key={idx}
@@ -483,7 +490,7 @@ export default function AdminCourtsPage() {
                                         <label
                                             className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary hover:bg-muted cursor-pointer transition-all bg-muted/50">
                                             <Camera className="w-5 h-5 mb-1"/>
-                                            <span className="text-[9px] font-black uppercase">Thêm</span>
+                                            <span className="text-[9px] font-black uppercase">{t("common.add") || "Add"}</span>
                                             <input type="file" multiple accept="image/*" onChange={handleFileChange}
                                                    className="hidden"/>
                                         </label>
@@ -494,8 +501,7 @@ export default function AdminCourtsPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="col-span-2">
                                     <label
-                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Tên
-                                        sân</label>
+                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">{t("courts.modalNameLabel")}</label>
                                     <input
                                         {...register("name")}
                                         className={`w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none transition-all font-bold text-sm ${errors.name ? 'border-destructive' : 'focus:border-primary focus:bg-background'}`}
@@ -506,8 +512,7 @@ export default function AdminCourtsPage() {
 
                                 <div className="col-span-2">
                                     <label
-                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Địa
-                                        chỉ chi tiết</label>
+                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">{t("courts.modalLocationLabel")}</label>
                                     <input
                                         {...register("location")}
                                         className={`w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none transition-all font-bold text-sm ${errors.location ? 'border-destructive' : 'focus:border-primary focus:bg-background'}`}
@@ -518,8 +523,7 @@ export default function AdminCourtsPage() {
 
                                 <div>
                                     <label
-                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Giá
-                                        thuê / Giờ</label>
+                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">{t("courts.modalPriceLabel")}</label>
                                     <input
                                         type="number"
                                         {...register("pricePerHour", {valueAsNumber: true})}
@@ -531,28 +535,25 @@ export default function AdminCourtsPage() {
 
                                 <div>
                                     <label
-                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Mô
-                                        tả sân</label>
+                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">{t("courts.modalDescLabel")}</label>
                                     <textarea
                                         {...register("description")}
                                         rows={3}
                                         className="w-full px-4 py-3 bg-muted/50 border rounded-xl outline-none focus:border-primary focus:bg-background font-bold text-sm transition-all resize-none"
-                                        placeholder="Nhập mô tả chi tiết về sân..."
+                                        placeholder={t("courts.modalDescPlaceholder")}
                                     />
                                 </div>
 
                                 <div>
                                     <label
-                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Giờ
-                                        mở cửa</label>
+                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">{t("courts.modalOpenTime")}</label>
                                     <input type="time" {...register("openingTime")}
                                            className="w-full h-11 px-4 bg-muted/50 border rounded-xl focus:border-primary focus:bg-background outline-none font-bold text-sm"/>
                                 </div>
 
                                 <div>
                                     <label
-                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Giờ
-                                        đóng cửa</label>
+                                        className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">{t("courts.modalCloseTime")}</label>
                                     <input type="time" {...register("closingTime")}
                                            className="w-full h-11 px-4 bg-muted/50 border rounded-xl focus:border-primary focus:bg-background outline-none font-bold text-sm"/>
                                 </div>
@@ -560,8 +561,7 @@ export default function AdminCourtsPage() {
 
                             <div className="space-y-3">
                                 <label
-                                    className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tiện
-                                    ích đi kèm</label>
+                                    className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">{t("courts.modalAmenitiesLabel")}</label>
                                 <div className="flex flex-wrap gap-2 mb-2">
                                     {watchAmenities.map((item) => (
                                         <div
@@ -585,7 +585,7 @@ export default function AdminCourtsPage() {
                                         value={amenityInput}
                                         onChange={(e) => setAmenityInput(e.target.value)}
                                         onKeyDown={addAmenity}
-                                        placeholder="Nhập tiện ích (VD: Trà đá miễn phí, Wifi...) và nhấn Enter"
+                                        placeholder={t("courts.modalAmenitiesPlaceholder")}
                                         className="w-full h-11 px-4 bg-muted/50 border rounded-xl outline-none focus:border-primary focus:bg-background font-bold text-sm transition-all"
                                     />
                                     <Plus
@@ -595,15 +595,15 @@ export default function AdminCourtsPage() {
 
                             <div className="flex gap-4 pt-4">
                                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}
-                                        className="flex-1 h-12 rounded-xl">Hủy bỏ</Button>
+                                        className="flex-1 h-12 rounded-xl cursor-pointer">{t("courts.cancel")}</Button>
                                 <Button
                                     type="submit"
                                     disabled={createMutation.isPending || updateMutation.isPending}
-                                    className="flex-[2] h-12 rounded-xl text-lg font-black uppercase tracking-widest"
+                                    className="flex-[2] h-12 rounded-xl text-lg font-black uppercase tracking-widest cursor-pointer active:scale-98"
                                 >
                                     {(createMutation.isPending || updateMutation.isPending) &&
                                         <Loader2 className="mr-2 h-5 w-5 animate-spin"/>}
-                                    Lưu dữ liệu
+                                    {t("courts.save")}
                                 </Button>
                             </div>
                         </form>

@@ -84,12 +84,12 @@ export default function AdminBookingsPage() {
             
             // Show dynamic toast based on event
             if (data?.customerName) {
-                toast.success(`Đơn hàng mới từ ${data.customerName}!`, {
+                toast.success(t("bookings.toastNewOrder", { name: data.customerName }), {
                     description: `${data.courtName} - ${data.totalPrice?.toLocaleString() ?? "0"}đ`,
                     duration: 5000,
                 });
             } else {
-                toast.info("Dữ liệu đơn hàng vừa có thay đổi.");
+                toast.info(t("bookings.toastOrderChanged"));
             }
 
             void queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
@@ -105,7 +105,7 @@ export default function AdminBookingsPage() {
             socket.off("booking_canceled", handleBookingChange);
             socket.off("booking_initiated", handleBookingChange);
         };
-    }, [socket, queryClient]);
+    }, [socket, queryClient, t]);
 
     // --- React Query: Fetch ---
     const { data: bookingsData, isLoading } = useQuery({

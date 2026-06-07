@@ -12,6 +12,7 @@ import {handleComingSoon} from "@/lib/coming-soon";
 import {useLanguage} from "@/context/language-context";
 
 export default function ExploreCourtsPage() {
+    const {t} = useLanguage();
     const [courtsData, setCourtsData] = useState<PaginatedCourts | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -24,11 +25,11 @@ export default function ExploreCourtsPage() {
             setCourtsData(data);
         } catch (error: unknown) {
             console.error("Fetch Courts Error:", error);
-            hotToast.error("Không thể tải danh sách sân");
+            hotToast.error(t("userDashboard.toastFetchError"));
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -42,8 +43,8 @@ export default function ExploreCourtsPage() {
         if (!socket) return;
 
         socket.on("court_added", (newCourt: Court) => {
-            toast.success("Một sân cầu lông mới vừa được thêm!", {
-                description: `Sân ${newCourt.name} tại ${newCourt.location} đã sẵn sàng phục vụ.`,
+            toast.success(t("userDashboard.toastNewCourtSuccess"), {
+                description: t("userDashboard.toastNewCourtSuccessDesc", { name: newCourt.name, location: newCourt.location }),
                 duration: 10000,
             });
 
@@ -70,11 +71,11 @@ export default function ExploreCourtsPage() {
             });
 
             if (data.isDeleted) {
-                toast.error(`Sân ${data.name} tạm ngưng hoạt động`, {
-                    description: "Chúng tôi sẽ sớm cập nhật khi sân mở lại.",
+                toast.error(t("userDashboard.toastCourtInactive", { name: data.name }), {
+                    description: t("userDashboard.toastCourtInactiveDesc"),
                 });
             } else {
-                toast.success(`Sân ${data.name} đã mở cửa trở lại!`);
+                toast.success(t("userDashboard.toastCourtActive", { name: data.name }));
             }
         });
 
@@ -88,7 +89,7 @@ export default function ExploreCourtsPage() {
                     )
                 };
             });
-            toast.info(`Thông tin sân ${updatedCourt.name} vừa được cập nhật.`);
+            toast.info(t("userDashboard.toastCourtUpdated", { name: updatedCourt.name }));
         });
 
         return () => {
@@ -96,9 +97,7 @@ export default function ExploreCourtsPage() {
             socket.off("court_status_changed");
             socket.off("court_updated");
         };
-    }, [socket]);
-
-    const {t} = useLanguage();
+    }, [socket, t]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();

@@ -4,6 +4,7 @@ import React from "react";
 import {usePathname} from "next/navigation";
 import {DashboardLayout} from "@/components/layouts/dashboard-layout";
 import {LayoutDashboard, Map, CalendarDays, Search, CalendarClock, UserCircle} from "lucide-react";
+import {useLanguage} from "@/context/language-context";
 
 const adminMenuItems = [
     {name: "Dashboard", href: "/admin", icon: LayoutDashboard},
@@ -25,12 +26,13 @@ export default function RootDashboardLayout({
 }) {
     const pathname = usePathname();
     const isAdmin = pathname.startsWith("/admin");
+    const {t} = useLanguage();
 
     return (
         <DashboardLayout
             menuItems={isAdmin ? adminMenuItems : userMenuItems}
-            roleLabel={isAdmin ? "Chủ sân" : "Khách hàng"}
-            roleDetail={isAdmin ? "Quản lý" : "Thành viên"}
+            roleLabel={isAdmin ? t("sidebar.roleAdminLabel") : t("sidebar.roleUserLabel")}
+            roleDetail={isAdmin ? t("sidebar.roleAdminDetail") : t("sidebar.roleUserDetail")}
         >
             {children}
         </DashboardLayout>
