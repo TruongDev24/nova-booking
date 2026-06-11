@@ -9,6 +9,7 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
 import { RegisterDto } from '../../src/auth/dto/register.dto';
+import { RedisService } from '../../src/redis/redis.service';
 
 jest.mock('bcrypt');
 
@@ -45,6 +46,12 @@ describe('AuthService', () => {
     },
   };
 
+  const mockRedisService = {
+    set: jest.fn(),
+    get: jest.fn(),
+    del: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -54,6 +61,7 @@ describe('AuthService', () => {
         { provide: MailerService, useValue: mockMailerService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: RedisService, useValue: mockRedisService },
       ],
     }).compile();
 
@@ -110,7 +118,7 @@ describe('AuthService', () => {
 
       // Verify tokens were NOT generated or saved
       expect(mockJwtService.signAsync).not.toHaveBeenCalled();
-      expect(mockPrismaService.refreshToken.create).not.toHaveBeenCalled();
+      expect(mockRedisService.set).not.toHaveBeenCalled();
     });
 
     it('Scenario 2 (Conflict Error - Email Exists): Nên báo lỗi nếu email đã tồn tại', async () => {
@@ -182,12 +190,12 @@ describe('AuthService', () => {
     it('should return access_token and user object', async () => {
       const token = 'jwt-token';
       mockJwtService.signAsync.mockResolvedValue(token);
-      mockPrismaService.refreshToken.create.mockResolvedValue({});
+      mockRedisService.set.mockResolvedValue(undefined);
 
       const result = await service.login(user, 'test-agent');
 
       expect(mockJwtService.signAsync).toHaveBeenCalled();
-      expect(mockPrismaService.refreshToken.create).toHaveBeenCalled();
+      expect(mockRedisService.set).toHaveBeenCalled();
       expect(result).toEqual({
         access_token: token,
         refresh_token: token,

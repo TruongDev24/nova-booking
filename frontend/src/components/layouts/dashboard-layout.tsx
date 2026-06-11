@@ -134,7 +134,6 @@ export function DashboardLayout({
         router.push("/login");
         sessionStorage.clear();
         Cookies.remove("access_token");
-        Cookies.remove("refresh_token");
         try {
             await authService.logout();
         } catch (e) {

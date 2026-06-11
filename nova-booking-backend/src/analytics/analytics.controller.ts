@@ -25,6 +25,11 @@ export class AnalyticsController {
     console.log(
       `[AnalyticsController] Fetching analytics for user ${userId}, period: ${period}, range: ${startDate} to ${endDate}`,
     );
-    return this.analyticsService.getAdminAnalytics(userId, days, startDate, endDate);
+    return this.analyticsService.getAdminAnalytics(
+      userId,
+      days,
+      startDate,
+      endDate,
+    );
   }
 }
