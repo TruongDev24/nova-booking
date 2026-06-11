@@ -84,10 +84,9 @@ export default function LoginPage() {
                 data
             );
 
-            const {access_token, refresh_token, user} = response.data;
+            const {access_token, user} = response.data;
 
             Cookies.set("access_token", access_token, {path: "/"});
-            Cookies.set("refresh_token", refresh_token, {path: "/", expires: 7});
             
             sessionStorage.setItem("user", JSON.stringify(user));
 

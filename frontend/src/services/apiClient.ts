@@ -5,6 +5,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 const apiClient = axios.create({
     baseURL: API_URL,
+    withCredentials: true,
 });
 
 interface FailedRequest {
@@ -79,22 +80,21 @@ apiClient.interceptors.response.use(
             isRefreshing = true;
             refreshChannel?.postMessage({ type: 'REFRESH_STARTED' });
 
-            const refreshToken = Cookies.get('refresh_token');
-            if (!refreshToken) {
+            const user = typeof window !== 'undefined' ? sessionStorage.getItem('user') : null;
+            if (!user) {
                 isRefreshing = false;
                 handleLogout();
                 return Promise.reject(error);
             }
 
             try {
-                const response = await axios.post(`${API_URL}/auth/refresh`, {
-                    refresh_token: refreshToken,
+                const response = await axios.post(`${API_URL}/auth/refresh`, {}, {
+                    withCredentials: true,
                 });
 
-                const { access_token, refresh_token } = response.data;
+                const { access_token } = response.data;
 
                 Cookies.set('access_token', access_token, { path: '/' });
-                Cookies.set('refresh_token', refresh_token, { path: '/' });
 
                 apiClient.defaults.headers.common.Authorization = `Bearer ${access_token}`;
                 

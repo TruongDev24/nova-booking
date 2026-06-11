@@ -31,8 +31,16 @@ export class AnalyticsService {
         const startParts = startStr.split('-').map(Number);
         const endParts = endStr.split('-').map(Number);
         if (startParts.length === 3 && endParts.length === 3) {
-          const startDateObj = new Date(startParts[0], startParts[1] - 1, startParts[2]);
-          const endDateObj = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+          const startDateObj = new Date(
+            startParts[0],
+            startParts[1] - 1,
+            startParts[2],
+          );
+          const endDateObj = new Date(
+            endParts[0],
+            endParts[1] - 1,
+            endParts[2],
+          );
           const diffTime = endDateObj.getTime() - startDateObj.getTime();
           const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
           return isNaN(diffDays) || diffDays < 0 ? 7 : diffDays + 1;

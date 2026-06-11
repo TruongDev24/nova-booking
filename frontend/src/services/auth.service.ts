@@ -37,13 +37,10 @@ export const authService = {
     },
 
     logout: async () => {
-        const refreshToken = Cookies.get('refresh_token');
-        if (refreshToken) {
-            try {
-                await apiClient.post('/auth/logout', { refresh_token: refreshToken });
-            } catch (error) {
-                console.error('Logout error:', error);
-            }
+        try {
+            await apiClient.post('/auth/logout', {});
+        } catch (error) {
+            console.error('Logout error:', error);
         }
         Cookies.remove('access_token');
         Cookies.remove('refresh_token');
