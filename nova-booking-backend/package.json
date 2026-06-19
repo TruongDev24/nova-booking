@@ -22,7 +22,7 @@
     "prisma:deploy": "npx prisma migrate deploy"
   },
   "dependencies": {
-    "@nestjs-modules/mailer": "^2.0.1",
+    "@nestjs-modules/mailer": "^2.3.7",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/cache-manager": "^3.1.2",
     "@nestjs/cli": "^11.0.0",
