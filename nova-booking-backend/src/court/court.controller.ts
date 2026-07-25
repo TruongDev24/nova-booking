@@ -24,6 +24,8 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import type { UserPayload } from '../common/interfaces/user-payload.interface';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
+import { Public } from '../common/decorators/public.decorator';
+
 @Controller('courts')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class CourtController {
@@ -67,14 +69,14 @@ export class CourtController {
     }
   }
 
+  @Public()
   @Get()
-  @Roles(Role.ADMIN, Role.USER)
   findAll(@GetUser() user: UserPayload, @Query() query: PaginationQueryDto) {
     return this.courtService.findAll(user, query);
   }
 
+  @Public()
   @Get(':id')
-  @Roles(Role.ADMIN, Role.USER)
   findOne(@Param('id') id: string) {
     return this.courtService.findOne(id);
   }
