@@ -57,8 +57,7 @@ export default function LoginPage() {
             router.push("/user");
           }
         } catch {
-          // Ignore parse error
-        }
+                  }
       }
     }
   }, [router]);
@@ -87,7 +86,11 @@ export default function LoginPage() {
       );
 
       const { access_token, user } = response.data;
-      Cookies.set("access_token", access_token, { path: "/" });
+      Cookies.set("access_token", access_token, {
+        path: "/",
+        expires: 7,
+        sameSite: "Lax",
+      });
       sessionStorage.setItem("user", JSON.stringify(user));
 
       toast.success(
@@ -96,22 +99,22 @@ export default function LoginPage() {
           : "Login successful! Redirecting..."
       );
 
-      if (user.role === "ADMIN") {
-        router.push("/admin");
-      } else {
-        if (!user.bankAccountNumber) {
-          toast(
-            locale === "vi"
-              ? "Vui lòng cập nhật thông tin ngân hàng trong trang cá nhân để thuận tiện cho việc hoàn tiền khi hủy sân."
-              : "Please update your bank details in your profile for seamless refunds on cancellations.",
-            {
-              duration: 6000,
-              icon: "🏦",
-            }
-          );
-        }
-        router.push("/user");
+      const redirectTarget = user.role === "ADMIN" ? "/admin" : "/user";
+      if (!user.bankAccountNumber && user.role !== "ADMIN") {
+        toast(
+          locale === "vi"
+            ? "Vui lòng cập nhật thông tin ngân hàng trong trang cá nhân để thuận tiện cho việc hoàn tiền khi hủy sân."
+            : "Please update your bank details in your profile for seamless refunds on cancellations.",
+          {
+            duration: 6000,
+            icon: "🏦",
+          }
+        );
       }
+
+      setTimeout(() => {
+        window.location.href = redirectTarget;
+      }, 600);
     } catch (error) {
       setFormState("idle");
       if (axios.isAxiosError(error)) {

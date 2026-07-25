@@ -50,7 +50,6 @@ const adminRegisterSchema = z
 type AdminRegisterFormValues = z.infer<typeof adminRegisterSchema>;
 
 export default function AdminRegisterPage() {
-    const router = useRouter();
     const {t, locale} = useLanguage();
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -80,13 +79,15 @@ export default function AdminRegisterPage() {
 
             const token = response.data?.access_token;
             if (token) {
-                Cookies.set("access_token", token, {path: "/"});
+                Cookies.set("access_token", token, {path: "/", expires: 7, sameSite: "Lax"});
                 sessionStorage.setItem("access_token", token);
                 sessionStorage.setItem("user", JSON.stringify(response.data.user));
             }
 
             toast.success(locale === "vi" ? "Đăng ký tài khoản Admin thành công!" : "Admin account created successfully!");
-            setTimeout(() => router.push("/admin"), 1500);
+            setTimeout(() => {
+                window.location.href = "/admin";
+            }, 1000);
         } catch (error: unknown) {
             if (axios.isAxiosError(error)) {
                 toast.error(error.response?.data?.message || (locale === "vi" ? "Đăng ký thất bại" : "Registration failed"));
