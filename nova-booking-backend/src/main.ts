@@ -34,8 +34,10 @@ async function bootstrap() {
   console.log('🚀 Allowed Origins:', allowedOrigins);
 
   app.enableCors({
-    origin: (origin, callback) => {
-      // Cho phép localhost, FRONTEND_URL, và tất cả tên miền con *.vercel.app
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       if (
         !origin ||
         origin.endsWith('.vercel.app') ||
