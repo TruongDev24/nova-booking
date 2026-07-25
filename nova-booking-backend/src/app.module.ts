@@ -59,6 +59,7 @@ import { AppController } from './app.controller';
         });
         return { store };
       },
+      inject: [ConfigService],
     }),
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
