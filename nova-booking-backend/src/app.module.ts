@@ -17,6 +17,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
 import { APP_GUARD } from '@nestjs/core';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -58,30 +59,29 @@ import { APP_GUARD } from '@nestjs/core';
         });
         return { store };
       },
-      inject: [ConfigService],
     }),
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
         const redisUrl = config.get<string>('REDIS_URL');
-        console.log('🚀 BullModule: Initializing with Redis...');
-
         if (redisUrl) {
-          const isSsl = redisUrl.startsWith('rediss://');
+          const parsed = new URL(redisUrl);
           return {
             connection: {
-              url: redisUrl,
-              ...(isSsl ? { tls: { rejectUnauthorized: false } } : {}),
+              host: parsed.hostname,
+              port: parseInt(parsed.port, 10) || 6379,
+              username: parsed.username || undefined,
+              password: parsed.password || undefined,
+              tls: parsed.protocol === 'rediss:' ? {} : undefined,
             },
           };
         }
-
         return {
           connection: {
             host: config.get('REDIS_HOST', 'localhost'),
-            port: config.get('REDIS_PORT', 6379),
-            password: config.get('REDIS_PASSWORD'),
+            port: config.get<number>('REDIS_PORT', 6379),
+            password: config.get('REDIS_PASSWORD') || undefined,
           },
         };
       },
@@ -94,10 +94,6 @@ import { APP_GUARD } from '@nestjs/core';
         const host = config.get<string>('SMTP_HOST', 'smtp-relay.brevo.com');
         const port = config.get<number>('SMTP_PORT', 2525);
         const user = config.get<string>('SMTP_USER');
-        console.log(
-          `🚀 MailerModule: Initializing with host=${host}, port=${port}, user=${user ? 'SET' : 'MISSING'}`,
-        );
-
         const smtpFrom = config.get<string>('SMTP_FROM');
         const fromAddress = smtpFrom || `"Nova Booking" <${user}>`;
 
@@ -132,7 +128,7 @@ import { APP_GUARD } from '@nestjs/core';
     PaymentModule,
     NotificationModule,
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_GUARD,
