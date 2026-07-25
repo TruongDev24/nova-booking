@@ -51,6 +51,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - TZ=Asia/Ho_Chi_Minh
+      - NODE_ENV=development
     depends_on:
       db:
         condition: service_healthy
