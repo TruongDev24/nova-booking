@@ -63,6 +63,7 @@ export default function LoginPage() {
     }
   }, [router]);
 
+<<<<<<< HEAD
   const {
     register,
     handleSubmit,
@@ -77,6 +78,13 @@ export default function LoginPage() {
   });
 
   const emailVal = watch("email");
+=======
+            const {access_token, user} = response.data;
+
+            Cookies.set("access_token", access_token, {path: "/"});
+            
+            sessionStorage.setItem("user", JSON.stringify(user));
+>>>>>>> 1f1b418629774ac0add19d4ad559cd1537716a8c
 
   const onSubmit = async (data: LoginFormValues) => {
     try {
