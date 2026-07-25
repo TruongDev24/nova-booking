@@ -34,7 +34,18 @@ async function bootstrap() {
   console.log('🚀 Allowed Origins:', allowedOrigins);
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Cho phép localhost, FRONTEND_URL, và tất cả tên miền con *.vercel.app
+      if (
+        !origin ||
+        origin.endsWith('.vercel.app') ||
+        allowedOrigins.includes(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
