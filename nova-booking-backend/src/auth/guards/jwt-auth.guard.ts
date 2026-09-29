@@ -22,28 +22,27 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) {
-      return true;
-    }
 
     const request = context
       .switchToHttp()
       .getRequest<Request & { user: UserPayload }>();
     const token = this.extractTokenFromHeader(request);
-    if (!token) {
+
+    if (token) {
+      try {
+        const payload = await this.jwtService.verifyAsync<UserPayload>(token, {
+          secret: process.env.JWT_SECRET || 'super-secret-key-for-jwt',
+        });
+        request.user = payload;
+      } catch {
+        if (!isPublic) {
+          throw new UnauthorizedException();
+        }
+      }
+    } else if (!isPublic) {
       throw new UnauthorizedException();
     }
 
-    try {
-      const payload = await this.jwtService.verifyAsync<UserPayload>(token, {
-        secret: process.env.JWT_SECRET || 'super-secret-key-for-jwt',
-      });
-      // We're assigning the payload to the request object here
-      // so that we can access it in our route handlers
-      request.user = payload;
-    } catch {
-      throw new UnauthorizedException();
-    }
     return true;
   }
 

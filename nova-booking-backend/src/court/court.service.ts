@@ -68,20 +68,19 @@ export class CourtService {
   }
 
   async findAll(
-    user: UserPayload,
+    user: UserPayload | undefined,
     query: PaginationQueryDto,
   ): Promise<{
     data: Court[];
     meta: { total: number; page: number; limit: number; lastPage: number };
   }> {
-    if (!user) {
-      throw new UnauthorizedException('Thông tin người dùng không hợp lệ');
-    }
-
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.max(1, Number(query.limit) || 10);
     const { search, sortBy, sortOrder } = query;
-    const cacheKey = `courts_${user.role}_${user.sub}_${page}_${limit}_${search || ''}_${sortBy || ''}_${sortOrder || ''}`;
+    
+    const role = user ? user.role : 'PUBLIC';
+    const sub = user ? user.sub : 'none';
+    const cacheKey = `courts_${role}_${sub}_${page}_${limit}_${search || ''}_${sortBy || ''}_${sortOrder || ''}`;
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const cachedData = await this.cacheManager.get<any>(cacheKey);
@@ -94,7 +93,7 @@ export class CourtService {
 
     const where: Prisma.CourtWhereInput = {};
 
-    if (user.role === Role.ADMIN) {
+    if (user?.role === Role.ADMIN) {
       where.ownerId = user.sub;
     } else {
       where.isDeleted = false;

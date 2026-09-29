@@ -41,4 +41,4 @@ EXPOSE 3001
 # Run migrations and start the app
 # Note: In a real production environment, you might want to run migrations 
 # as a separate step in CI/CD or using a dedicated migration job.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]

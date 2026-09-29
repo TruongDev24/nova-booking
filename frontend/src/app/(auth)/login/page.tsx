@@ -82,7 +82,8 @@ export default function LoginPage() {
       setFormState("submitting");
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/auth/login`,
-        data
+        data,
+        { withCredentials: true }
       );
 
       const { access_token, user } = response.data;
